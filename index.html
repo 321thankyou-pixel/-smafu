@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>スマ譜 Prototype v0.1.1</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#1f2328; --muted:#6b7280;
+    --accent:#d946ef; --line:#d9dde5;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink)}
+  header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:10px 12px}
+  .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  h1{font-size:18px;margin:0 10px 0 0}
+  input,select,button,textarea{font:inherit}
+  input,select,textarea{border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px}
+  button{border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px 11px}
+  button.primary{background:#111827;color:#fff;border-color:#111827}
+  button.danger{color:#b91c1c}
+  .wrap{max-width:1100px;margin:0 auto;padding:14px}
+  .controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+  .control{background:var(--panel);padding:9px;border:1px solid var(--line);border-radius:10px}
+  .control label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}
+  .control input,.control select{width:100%;min-width:0}
+  .status{font-size:12px;color:var(--muted);margin:8px 0 12px}
+  .measure{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:0 0 12px;padding:10px;overflow:hidden}
+  .measure.active{outline:2px solid rgba(217,70,239,.35)}
+  .measure-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .mnum{font-weight:700;min-width:58px}
+  .section-tag{font-size:12px;color:var(--muted);flex:1}
+  .lyrics{width:100%;min-height:44px;resize:vertical;margin-bottom:8px}
+  .beats{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:10px;overflow:hidden;position:relative}
+  .beat{min-height:88px;padding:6px;border-right:1px solid var(--line);background:#fff}
+  .beat:last-child{border-right:0}
+  .beat-no{font-size:11px;color:var(--muted);margin-bottom:5px}
+  .beat input{width:100%;font-weight:700;text-align:center;padding:6px 3px}
+  .beat.current{background:#fff4ff}
+  .cursor{position:absolute;top:0;bottom:0;width:3px;background:var(--accent);pointer-events:none;display:none;z-index:5}
+  .diagram-area{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+  .diagram{border:1px dashed var(--line);border-radius:10px;padding:8px;min-height:90px}
+  .diagram h3{font-size:12px;margin:0 0 6px;color:var(--muted)}
+  .piano{display:flex;height:58px;max-width:260px;position:relative}
+  .white{flex:1;border:1px solid #777;background:white;position:relative}
+  .white.on{background:#e9d5ff}
+  .black{position:absolute;width:8%;height:36px;background:#111;z-index:2;top:0}
+  .black.on{background:#c026d3}
+  .footer-actions{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 40px}
+  .help{font-size:13px;line-height:1.6;color:#4b5563;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}
+  @media(max-width:700px){
+    .diagram-area{grid-template-columns:1fr}
+    .beat{min-height:82px;padding:4px}
+    h1{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>スマ譜 Prototype v0.1.1</h1>
+    <button id="playBtn" class="primary">▶ 再生</button>
+    <button id="stopBtn">■ 停止</button>
+    <button id="saveBtn">保存</button>
+    <button id="resetBtn">サンプルに戻す</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <div class="control"><label>曲名</label><input id="title"></div>
+    <div class="control"><label>セクション</label><select id="sectionSelect"></select></div>
+    <div class="control"><label>BPM</label><input id="bpm" type="number" min="30" max="240"></div>
+    <div class="control"><label>拍子</label><select id="meter"><option value="4">4/4</option></select></div>
+    <div class="control"><label>カポ</label><input id="capo" type="number" min="0" max="11"></div>
+    <div class="control"><label>コード表示</label>
+      <select id="displayMode">
+        <option value="shape">ギター用（カポ反映）</option>
+        <option value="concert">実音コード</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="status" class="status">初期化中...</div>
+  <div id="score"></div>
+
+  <div class="footer-actions">
+    <button id="addMeasure">＋ 小節追加</button>
+    <button id="addSection">＋ セクション追加</button>
+    <button id="exportBtn">JSON書き出し</button>
+    <button type="button" id="importBtn">JSON読込み</button>
+    <input id="importFile" type="file" accept="application/json" style="display:none">
+  </div>
+
+  <div class="help">
+    各小節の歌詞を入力し、1〜4拍目にコードを入れてください。再生するとBPMに合わせて拍が進みます。
+    カポを変更すると「ギター用」表示のコード名が自動変換されます。
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+var NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+var ENHARMONIC = {'Db':'C#','Eb':'D#','Gb':'F#','Ab':'G#','Bb':'A#','Cb':'B','Fb':'E','E#':'F','B#':'C'};
+
+var SAMPLE = {
+  title:'サンプル曲',
+  bpm:84,
+  capo:0,
+  sections:[
+    {name:'Aメロ', measures:[
+      {lyrics:'ここに歌詞を入力', beats:['C','','Am7','']},
+      {lyrics:'小節ごとに分けて入力', beats:['Fmaj7','','G7','']}
+    ]},
+    {name:'サビ', measures:[
+      {lyrics:'コードを拍単位で配置', beats:['C','G/B','Am7','G']},
+      {lyrics:'再生カーソルが進みます', beats:['F','G','C','']}
+    ]}
+  ]
+};
+
+function cloneSample(){
+  return JSON.parse(JSON.stringify(SAMPLE));
+}
+
+function safeLoad(){
+  try{
+    var raw = window.localStorage ? localStorage.getItem('smafu_v011') : null;
+    if(!raw) return cloneSample();
+    var parsed = JSON.parse(raw);
+    if(!parsed || !parsed.sections || !parsed.sections.length) return cloneSample();
+    return parsed;
+  }catch(e){
+    return cloneSample();
+  }
+}
+
+var data = safeLoad();
+var activeSection = 0;
+var playing = false;
+var timer = null;
+var playState = {m:0,b:0};
+
+function byId(id){ return document.getElementById(id); }
+function status(msg){ byId('status').textContent = msg; }
+
+function normalizeRoot(root){ return ENHARMONIC[root] || root; }
+
+function transposeChord(chord, semitones){
+  if(!chord) return '';
+  var m = chord.match(/^([A-G](?:#|b)?)(.*)$/);
+  if(!m) return chord;
+  var root = normalizeRoot(m[1]);
+  var rest = m[2];
+  var idx = NOTE_NAMES.indexOf(root);
+  if(idx < 0) return chord;
+  var newRoot = NOTE_NAMES[(idx + semitones + 120) % 12];
+  rest = rest.replace(/\/([A-G](?:#|b)?)/g, function(all,bass){
+    bass = normalizeRoot(bass);
+    var bi = NOTE_NAMES.indexOf(bass);
+    return bi >= 0 ? '/' + NOTE_NAMES[(bi + semitones + 120) % 12] : all;
+  });
+  return newRoot + rest;
+}
+
+function shownChord(raw){
+  var mode = byId('displayMode').value;
+  var capo = parseInt(byId('capo').value,10) || 0;
+  return mode === 'shape' ? transposeChord(raw,-capo) : raw;
+}
+
+function parseChord(chord){
+  var m=(chord||'').match(/^([A-G](?:#|b)?)(m|maj|M|dim|aug|sus)?(2|4|5|6|7|9|11|13)?/);
+  if(!m) return null;
+  var root=NOTE_NAMES.indexOf(normalizeRoot(m[1]));
+  if(root<0) return null;
+  var q=m[2]||'', ext=m[3]||'';
+  var ints=[0,4,7];
+  if(q==='m') ints=[0,3,7];
+  if(q==='dim') ints=[0,3,6];
+  if(q==='aug') ints=[0,4,8];
+  if(q==='sus') ints=[0,5,7];
+  if(ext==='7') ints.push((q==='maj'||q==='M')?11:10);
+  if(ext==='6') ints.push(9);
+  if(ext==='9'){ ints.push(10); ints.push(14); }
+  var out=[], seen={};
+  for(var i=0;i<ints.length;i++){
+    var pc=(root+ints[i])%12;
+    if(!seen[pc]){seen[pc]=true;out.push(pc);}
+  }
+  return out;
+}
+
+function drawGuitar(chord,el){
+  el.innerHTML='<h3>ギター</h3>';
+  var label=document.createElement('div');
+  label.style.fontSize='28px';
+  label.style.fontWeight='700';
+  label.textContent=chord || '—';
+  el.appendChild(label);
+}
+
+function drawPiano(chord,el){
+  el.innerHTML='<h3>ピアノ</h3>';
+  var pcs=parseChord(chord);
+  if(!pcs){
+    var t=document.createElement('div');
+    t.style.fontSize='13px';
+    t.style.color='#6b7280';
+    t.textContent=chord ? '解析不可: '+chord : '—';
+    el.appendChild(t);
+    return;
+  }
+  var piano=document.createElement('div'); piano.className='piano';
+  var whites=[0,2,4,5,7,9,11,12,14,16,17,19,21,23];
+  var i;
+  for(i=0;i<whites.length;i++){
+    var w=document.createElement('div');
+    w.className='white' + (pcs.indexOf(whites[i]%12)>=0 ? ' on':'');
+    piano.appendChild(w);
+  }
+  var blacks=[1,3,null,6,8,10,null,13,15,null,18,20,22];
+  for(i=0;i<blacks.length;i++){
+    if(blacks[i]===null) continue;
+    var b=document.createElement('div');
+    b.className='black' + (pcs.indexOf(blacks[i]%12)>=0 ? ' on':'');
+    b.style.left=((i+0.72)/14*100)+'%';
+    piano.appendChild(b);
+  }
+  el.appendChild(piano);
+}
+
+function syncMeta(){
+  data.title=byId('title').value || '無題';
+  data.bpm=parseInt(byId('bpm').value,10) || 84;
+  data.capo=parseInt(byId('capo').value,10) || 0;
+}
+
+function render(){
+  if(!data.sections || !data.sections.length){
+    data=cloneSample();
+    activeSection=0;
+  }
+  if(activeSection<0 || activeSection>=data.sections.length) activeSection=0;
+
+  byId('title').value=data.title || 'サンプル曲';
+  byId('bpm').value=data.bpm || 84;
+  byId('capo').value=data.capo || 0;
+
+  var sel=byId('sectionSelect');
+  sel.innerHTML='';
+  for(var i=0;i<data.sections.length;i++){
+    var opt=document.createElement('option');
+    opt.value=String(i);
+    opt.textContent=data.sections[i].name || ('セクション'+(i+1));
+    sel.appendChild(opt);
+  }
+  sel.value=String(activeSection);
+
+  var sec=data.sections[activeSection];
+  if(!sec.measures || !sec.measures.length){
+    sec.measures=[{lyrics:'',beats:['','','','']}];
+  }
+
+  var score=byId('score');
+  score.innerHTML='';
+
+  for(var mi=0;mi<sec.measures.length;mi++){
+    (function(mi){
+      var m=sec.measures[mi];
+      if(!m.beats || m.beats.length<4) m.beats=['','','',''];
+
+      var box=document.createElement('div');
+      box.className='measure';
+      box.setAttribute('data-mi',String(mi));
+
+      var head=document.createElement('div');
+      head.className='measure-head';
+
+      var num=document.createElement('div');
+      num.className='mnum';
+      num.textContent='小節 '+(mi+1);
+
+      var tag=document.createElement('div');
+      tag.className='section-tag';
+      tag.textContent=sec.name || '';
+
+      var del=document.createElement('button');
+      del.className='danger';
+      del.textContent='削除';
+      del.onclick=function(){
+        if(sec.measures.length>1){
+          sec.measures.splice(mi,1);
+          render();
+        }
+      };
+
+      head.appendChild(num); head.appendChild(tag); head.appendChild(del);
+      box.appendChild(head);
+
+      var ly=document.createElement('textarea');
+      ly.className='lyrics';
+      ly.value=m.lyrics || '';
+      ly.placeholder='この小節の歌詞';
+      ly.oninput=function(){ m.lyrics=ly.value; };
+      box.appendChild(ly);
+
+      var beats=document.createElement('div');
+      beats.className='beats';
+
+      var cursor=document.createElement('div');
+      cursor.className='cursor';
+      beats.appendChild(cursor);
+
+      for(var bi=0;bi<4;bi++){
+        (function(bi){
+          var beat=document.createElement('div');
+          beat.className='beat';
+          beat.setAttribute('data-bi',String(bi));
+
+          var bn=document.createElement('div');
+          bn.className='beat-no';
+          bn.textContent=(bi+1)+'拍目';
+
+          var inp=document.createElement('input');
+          inp.value=shownChord(m.beats[bi]||'');
+          inp.placeholder='—';
+          inp.onchange=function(){
+            var mode=byId('displayMode').value;
+            var capo=parseInt(byId('capo').value,10)||0;
+            m.beats[bi]=(mode==='shape') ? transposeChord(inp.value,capo) : inp.value;
+            render();
+          };
+
+          beat.appendChild(bn);
+          beat.appendChild(inp);
+          beats.appendChild(beat);
+        })(bi);
+      }
+
+      box.appendChild(beats);
+
+      var darea=document.createElement('div');
+      darea.className='diagram-area';
+      var gd=document.createElement('div'); gd.className='diagram';
+      var pd=document.createElement('div'); pd.className='diagram';
+
+      var firstRaw='';
+      for(var k=0;k<m.beats.length;k++){ if(m.beats[k]){firstRaw=m.beats[k];break;} }
+      drawGuitar(shownChord(firstRaw),gd);
+      drawPiano(firstRaw,pd);
+
+      darea.appendChild(gd); darea.appendChild(pd);
+      box.appendChild(darea);
+      score.appendChild(box);
+    })(mi);
+  }
+
+  status('停止中');
+}
+
+function save(){
+  syncMeta();
+  try{
+    if(window.localStorage){
+      localStorage.setItem('smafu_v011',JSON.stringify(data));
+      status('保存しました');
+    }else{
+      status('この環境ではブラウザ保存が使えません');
+    }
+  }catch(e){
+    status('保存できませんでした');
+  }
+}
+
+function currentInterval(){
+  return 60000/(parseInt(byId('bpm').value,10)||84);
+}
+
+function clearVisual(){
+  var xs=document.querySelectorAll('.measure');
+  for(var i=0;i<xs.length;i++) xs[i].classList.remove('active');
+  xs=document.querySelectorAll('.beat');
+  for(i=0;i<xs.length;i++) xs[i].classList.remove('current');
+  xs=document.querySelectorAll('.cursor');
+  for(i=0;i<xs.length;i++) xs[i].style.display='none';
+}
+
+function updatePlayVisual(){
+  clearVisual();
+  var box=document.querySelector('.measure[data-mi="'+playState.m+'"]');
+  if(!box) return;
+  box.classList.add('active');
+  var beat=box.querySelector('.beat[data-bi="'+playState.b+'"]');
+  if(beat) beat.classList.add('current');
+  var cursor=box.querySelector('.cursor');
+  if(cursor){
+    cursor.style.display='block';
+    cursor.style.left=(playState.b*25)+'%';
+  }
+
+  var sec=data.sections[activeSection];
+  var raw=(sec.measures[playState.m] && sec.measures[playState.m].beats[playState.b]) || '';
+  if(raw){
+    var areas=box.querySelectorAll('.diagram');
+    if(areas.length>=2){
+      drawGuitar(shownChord(raw),areas[0]);
+      drawPiano(raw,areas[1]);
+    }
+  }
+  status('再生中：小節 '+(playState.m+1)+' / '+(playState.b+1)+'拍目');
+}
+
+function step(){
+  if(!playing) return;
+  updatePlayVisual();
+  playState.b++;
+  if(playState.b>=4){playState.b=0;playState.m++;}
+  var sec=data.sections[activeSection];
+  if(playState.m>=sec.measures.length){
+    stop();
+    return;
+  }
+  timer=setTimeout(step,currentInterval());
+}
+
+function play(){
+  syncMeta();
+  playing=true;
+  if(timer) clearTimeout(timer);
+  playState={m:0,b:0};
+  step();
+}
+
+function stop(){
+  playing=false;
+  if(timer) clearTimeout(timer);
+  timer=null;
+  playState={m:0,b:0};
+  clearVisual();
+  status('停止中');
+}
+
+byId('playBtn').onclick=play;
+byId('stopBtn').onclick=stop;
+byId('saveBtn').onclick=save;
+byId('resetBtn').onclick=function(){
+  if(window.confirm('保存内容をサンプルに戻しますか？')){
+    data=cloneSample();
+    activeSection=0;
+    try{ localStorage.removeItem('smafu_v011'); }catch(e){}
+    render();
+  }
+};
+byId('sectionSelect').onchange=function(){
+  stop();
+  activeSection=parseInt(this.value,10)||0;
+  render();
+};
+byId('displayMode').onchange=render;
+byId('capo').onchange=function(){
+  data.capo=parseInt(this.value,10)||0;
+  render();
+};
+byId('addMeasure').onclick=function(){
+  data.sections[activeSection].measures.push({lyrics:'',beats:['','','','']});
+  render();
+};
+byId('addSection').onclick=function(){
+  var name=window.prompt('セクション名（例：Bメロ、サビ）');
+  if(name){
+    data.sections.push({name:name,measures:[{lyrics:'',beats:['','','','']}]});
+    activeSection=data.sections.length-1;
+    render();
+  }
+};
+byId('exportBtn').onclick=function(){
+  syncMeta();
+  try{
+    var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='smafu-song.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);document.body.removeChild(a);},0);
+  }catch(e){
+    alert('この環境では書き出しできませんでした');
+  }
+};
+byId('importBtn').onclick=function(){ byId('importFile').click(); };
+byId('importFile').onchange=function(e){
+  var f=e.target.files && e.target.files[0];
+  if(!f) return;
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{
+      var obj=JSON.parse(reader.result);
+      if(!obj.sections || !obj.sections.length) throw new Error('bad');
+      data=obj;
+      activeSection=0;
+      save();
+      render();
+    }catch(err){
+      alert('JSONを読み込めませんでした');
+    }
+  };
+  reader.readAsText(f);
+};
+
+byId('title').onchange=syncMeta;
+byId('bpm').onchange=syncMeta;
+
+render();
+
+})();
+</script>
+</body>
+</html>
