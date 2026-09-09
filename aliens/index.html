@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>エイリアンズ コードフォーム選択 PoC v12</title>
+<style>
+:root{--pink:#ff2f92;--ink:#111;--line:#e5e5e5;--ok:#0a8f3c;--ng:#c0261c}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:#efefed;color:#111;-webkit-text-size-adjust:100%;
+ font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif}
+button{font:inherit;color:inherit;-webkit-appearance:none;appearance:none;
+ -webkit-tap-highlight-color:rgba(255,47,146,.18);touch-action:manipulation;cursor:pointer}
+.app{max-width:430px;margin:0 auto;background:#fff;min-height:100vh}
+header{position:-webkit-sticky;position:sticky;top:0;z-index:30;background:#fff;padding:11px 12px;border-bottom:1px solid #eee}
+h1{font-size:19px;margin:0}
+.meta{font-size:10px;color:#777;margin-top:3px}
+main{padding:10px 10px 92px}
+
+/* 受入テストパネル */
+.panel{border:2px solid #111;border-radius:14px;padding:10px;margin-bottom:12px;background:#fcfcfc}
+.panel h2{font-size:12px;margin:0 0 7px}
+.chk{display:flex;gap:7px;align-items:flex-start;font-size:11px;line-height:1.45;margin:4px 0}
+.badge{flex:none;min-width:34px;text-align:center;font-size:10px;font-weight:900;border-radius:999px;padding:2px 5px;background:#eee;color:#555}
+.badge.ok{background:var(--ok);color:#fff}
+.badge.ng{background:var(--ng);color:#fff}
+.badge.wait{background:#e6a100;color:#fff}
+.panel .hint{font-size:10px;color:#777;margin-top:7px;line-height:1.5}
+#errbox{display:none;background:#fdecea;border:1px solid var(--ng);color:var(--ng);
+ border-radius:10px;padding:9px;font-size:11px;margin-bottom:10px;white-space:pre-wrap;word-break:break-all}
+
+.sectionTitle{font-size:10px;font-weight:900;color:#777;margin:12px 0 5px}
+.lyric{font-size:20px;font-weight:900;text-align:center;padding:10px;border:1px solid #ddd;border-radius:14px}
+.lyric small{display:block;font-size:10px;color:#999;margin-top:5px;font-weight:400}
+.nav{display:grid;grid-template-columns:.95fr 1.55fr .9fr;gap:8px;align-items:start;margin-top:12px}
+.card{width:100%;border:1px solid #ddd;border-radius:15px;padding:9px 6px;text-align:center;background:#fff;min-width:0;display:block}
+.card.current{border:2px solid #111;background:#fafafa}
+.card.next{border:2px solid var(--pink);box-shadow:0 5px 16px rgba(255,47,146,.14)}
+.card.after{opacity:.62}
+.card:active{background:#f1f1f1}
+.role{font-size:9px;font-weight:900;color:#888}
+.next .role{color:var(--pink)}
+.chord{font-size:21px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.next .chord{font-size:29px}
+.form{font-size:9px;color:#777;margin-top:2px;min-height:12px;word-break:break-all}
+.diagram{margin-top:6px}
+.tapmark{font-size:8px;color:var(--pink);font-weight:900;margin-top:5px}
+.sRow{display:grid;grid-template-columns:17px 1fr;align-items:center;height:13px}
+.sLab{font-size:7px;color:#666}
+.sLine{position:relative;border-top:1px solid #333;height:100%}
+.fg{position:absolute;left:0;right:0;top:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr)}
+.fg i{border-left:1px solid #666}
+.nut .fg i:first-child{border-left:3px solid #111}
+.fg i:last-child{border-right:1px solid #666}
+.dot{position:absolute;width:9px;height:9px;top:-4px;background:#111;border-radius:50%;
+ -webkit-transform:translateX(-50%);transform:translateX(-50%)}
+.noDiagram{font-size:8px;color:#aaa;padding:10px 0}
+.fretNo{font-size:7px;color:#999;text-align:right;padding-right:2px;margin-top:1px}
+
+.bar{height:6px;background:#eee;border-radius:999px;overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;width:0;background:var(--pink)}
+.controls{display:flex;gap:7px;margin-top:10px}
+.ctrl{border:0;border-radius:10px;padding:9px 12px;font-weight:900;background:#111;color:#fff}
+.ctrl.alt{background:#eee;color:#111}
+
+.look{margin-top:18px;border-top:1px solid #eee;padding-top:10px}
+.lookhead{font-size:12px;font-weight:900;margin-bottom:8px}
+.sec{font-size:10px;font-weight:900;color:#666;margin:12px 2px 5px;display:flex;align-items:center;gap:7px}
+.sec:before,.sec:after{content:"";height:1px;background:#ddd;flex:1}
+.mini{border:1px solid #e0e0e0;border-radius:10px;padding:6px 7px;margin-bottom:6px;background:#fafafa}
+.mini.activeMeasure{border:2px solid #111;background:#fff}
+.mtop{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.mno{font-size:9px;font-weight:900;color:#888}
+.cue{font-size:8px;font-weight:900;background:#111;color:#fff;border-radius:999px;padding:2px 6px}
+.mchords{display:flex;margin-top:5px;border:1px solid #ddd;border-radius:6px;overflow:hidden;background:#fff}
+.mc{text-align:center;padding:4px 2px;border-right:1px solid #ddd;font-size:11px;font-weight:900;min-width:0;overflow:hidden}
+.mc:last-child{border-right:0}
+.mc small{display:block;font-size:7px;color:#999;font-weight:400}
+
+/* ボトムシート */
+.scrim{position:fixed;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,.4);z-index:50;display:none;
+ border:0;width:100%;padding:0;margin:0}
+.scrim.open{display:block}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:#fff;
+ border-radius:18px 18px 0 0;max-height:80%;overflow-y:auto;-webkit-overflow-scrolling:touch;
+ padding:13px 12px calc(18px + env(safe-area-inset-bottom));display:none;
+ max-width:430px;margin:0 auto}
+.sheet.open{display:block}
+.sheetHead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sheetTitle{font-size:18px;font-weight:900}
+.closeBtn{border:0;background:#eee;border-radius:999px;width:36px;height:36px;font-size:18px;font-weight:900}
+.sheetNote{font-size:10px;color:#888;margin:5px 0 10px;line-height:1.5}
+.vopt{width:100%;border:1px solid #ddd;border-radius:13px;background:#fff;padding:10px;margin:0 0 9px;
+ text-align:left;display:grid;grid-template-columns:1fr 118px;gap:10px;align-items:center}
+.vopt.selected{border:2px solid var(--pink);background:#fff6fa}
+.vopt>span{display:block;min-width:0}
+.vname{display:block;font-size:15px;font-weight:900}
+.vform{display:block;font-size:12px;color:#444;margin-top:3px;word-break:break-all;
+ font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em}
+.vnotes{display:block;font-size:10px;color:#888;margin-top:3px}
+.vsrc{display:block;font-size:9px;color:#999;margin-top:3px}
+.vsel{display:block;font-size:10px;color:var(--pink);font-weight:900;margin-top:5px}
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:25;background:#fff;border-top:1px solid #eee;
+ padding:7px 12px calc(7px + env(safe-area-inset-bottom));max-width:430px;margin:0 auto}
+.songbar{height:4px;background:#eee;border-radius:999px;overflow:hidden}
+.songbar i{display:block;height:100%;width:0;background:var(--pink)}
+.brow{display:flex;justify-content:space-between;font-size:10px;color:#666;margin-top:5px}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+ <h1>エイリアンズ</h1>
+ <div class="meta">Play: G / 半音下げチューニング ・ 4/4 ・ BPM 85 ・ 126小節</div>
+</header>
+<main>
+
+<div id="errbox"></div>
+
+<div class="panel">
+ <h2>iPhone Safari 受入テスト</h2>
+ <div class="chk"><span class="badge" id="b1">…</span><span>① JavaScriptが動いている</span></div>
+ <div class="chk"><span class="badge" id="b2">…</span><span>② 保存領域（localStorage）が使える</span></div>
+ <div class="chk"><span class="badge" id="b3">…</span><span id="t3">③ コードカードをタップ → 候補が出る</span></div>
+ <div class="chk"><span class="badge" id="b4">…</span><span id="t4">④ 候補を選ぶ → ダイアグラムが即時に変わる</span></div>
+ <div class="chk"><span class="badge" id="b5">…</span><span id="t5">⑤ 再読み込み後も選択が残っている</span></div>
+ <div class="hint">③④を手で操作したあと、このページを<b>下に引いて再読み込み</b>してください。⑤が緑になれば受入テスト合格です。</div>
+ <div class="controls">
+  <button class="ctrl alt" id="btnReload" type="button">↻ 再読み込み</button>
+  <button class="ctrl alt" id="btnClear" type="button">保存を消す</button>
+ </div>
+</div>
+
+<div class="sectionTitle" id="sectionTitle">Intro</div>
+<div class="lyric" id="lyric">Intro（歌詞位置）<small>4/4 ・ M1</small></div>
+
+<div class="nav" id="nav"><button class="card current" type="button" data-slot="current"><div class="role">現在</div><div class="chord">CM7</div><div class="form">x32000</div><div class="diagram"><div class="dg"><div class="sRow"><div class="sLab">1 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">2 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">3 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">2F〜</div></div></div><div class="tapmark">タップで変更</div></button><button class="card next" type="button" data-slot="next"><div class="role">次</div><div class="chord">Baug7(b9)</div><div class="form">x21213</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:50.00%"></span></div></div><div class="sRow"><div class="sLab">2 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">3 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button><button class="card after" type="button" data-slot="after"><div class="role">その次</div><div class="chord">B7</div><div class="form">x21202</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">2 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">3 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button></div>
+<div class="bar"><i id="codebar"></i></div>
+<div class="controls">
+ <button class="ctrl" id="play" type="button">▶ 再生</button>
+ <button class="ctrl alt" id="reset" type="button">↺ 戻す</button>
+</div>
+
+<div class="look">
+ <div class="lookhead">全曲譜面（先読み）</div>
+ <div class="sec">Intro</div><div class="mini" data-mi="0"><div class="mtop"><span class="mno">M1</span><span class="cue">イントロ</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="1"><div class="mtop"><span class="mno">M2</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(b9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="2"><div class="mtop"><span class="mno">M3</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="3"><div class="mtop"><span class="mno">M4</span></div><div class="mchords"><div class="mc" style="width:50.0000%">A7(13)<small>2拍</small></div><div class="mc" style="width:50.0000%">A7<small>2拍</small></div></div></div><div class="mini" data-mi="4"><div class="mtop"><span class="mno">M5</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="5"><div class="mtop"><span class="mno">M6</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Dsus4/B<small>2拍</small></div><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div></div></div><div class="mini" data-mi="6"><div class="mtop"><span class="mno">M7</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="7"><div class="mtop"><span class="mno">M8</span><span class="cue">歌入り直前</span></div><div class="mchords"><div class="mc" style="width:50.0000%">N.C.<small>2拍</small></div><div class="mc" style="width:50.0000%">F9<small>2拍</small></div></div></div><div class="sec">Aメロ1</div><div class="mini" data-mi="8"><div class="mtop"><span class="mno">M9</span><span class="cue">歌入り</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="9"><div class="mtop"><span class="mno">M10</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Am7<small>2拍</small></div><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div></div></div><div class="mini" data-mi="10"><div class="mtop"><span class="mno">M11</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Em7<small>2拍</small></div><div class="mc" style="width:25.0000%">G7/D<small>1拍</small></div><div class="mc" style="width:25.0000%">CM7<small>1拍</small></div></div></div><div class="mini" data-mi="11"><div class="mtop"><span class="mno">M12</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div><div class="mc" style="width:50.0000%">Bb7<small>2拍</small></div></div></div><div class="mini" data-mi="12"><div class="mtop"><span class="mno">M13</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="13"><div class="mtop"><span class="mno">M14</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div><div class="mc" style="width:50.0000%">Baug7<small>2拍</small></div></div></div><div class="mini" data-mi="14"><div class="mtop"><span class="mno">M15</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="15"><div class="mtop"><span class="mno">M16</span></div><div class="mchords"><div class="mc" style="width:50.0000%">N.C.<small>2拍</small></div><div class="mc" style="width:50.0000%">F9<small>2拍</small></div></div></div><div class="mini" data-mi="16"><div class="mtop"><span class="mno">M17</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="17"><div class="mtop"><span class="mno">M18</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Am7<small>2拍</small></div><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div></div></div><div class="mini" data-mi="18"><div class="mtop"><span class="mno">M19</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Em7<small>2拍</small></div><div class="mc" style="width:25.0000%">G9(13)<small>1拍</small></div><div class="mc" style="width:25.0000%">CM7<small>1拍</small></div></div></div><div class="mini" data-mi="19"><div class="mtop"><span class="mno">M20</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div><div class="mc" style="width:50.0000%">Bb7<small>2拍</small></div></div></div><div class="mini" data-mi="20"><div class="mtop"><span class="mno">M21</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="21"><div class="mtop"><span class="mno">M22</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div><div class="mc" style="width:50.0000%">Baug7<small>2拍</small></div></div></div><div class="mini" data-mi="22"><div class="mtop"><span class="mno">M23</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7/E<small>2拍</small></div><div class="mc" style="width:50.0000%">E7<small>2拍</small></div></div></div><div class="sec">Bメロ1</div><div class="mini" data-mi="23"><div class="mtop"><span class="mno">M24</span><span class="cue">Bメロ頭</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="24"><div class="mtop"><span class="mno">M25</span></div><div class="mchords"><div class="mc" style="width:50.0000%">CmM7(13)<small>2拍</small></div><div class="mc" style="width:50.0000%">D9sus4<small>2拍</small></div></div></div><div class="mini" data-mi="25"><div class="mtop"><span class="mno">M26</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="26"><div class="mtop"><span class="mno">M27</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Dm7<small>2拍</small></div><div class="mc" style="width:25.0000%">D/E<small>1拍</small></div><div class="mc" style="width:25.0000%">E9<small>1拍</small></div></div></div><div class="mini" data-mi="27"><div class="mtop"><span class="mno">M28</span></div><div class="mchords"><div class="mc" style="width:100.0000%">C#m7-5<small>4拍</small></div></div></div><div class="mini" data-mi="28"><div class="mtop"><span class="mno">M29</span></div><div class="mchords"><div class="mc" style="width:50.0000%">F#7(b9)<small>2拍</small></div><div class="mc" style="width:50.0000%">F#7<small>2拍</small></div></div></div><div class="mini" data-mi="29"><div class="mtop"><span class="mno">M30</span></div><div class="mchords"><div class="mc" style="width:75.0000%">Bm7<small>3拍</small></div><div class="mc" style="width:25.0000%">F#(b9)/Bb<small>1拍</small></div></div></div><div class="mini" data-mi="30"><div class="mtop"><span class="mno">M31</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Am7<small>2拍</small></div><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div></div></div><div class="sec">サビ1</div><div class="mini" data-mi="31"><div class="mtop"><span class="mno">M32</span><span class="cue">サビ頭</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="32"><div class="mtop"><span class="mno">M33</span></div><div class="mchords"><div class="mc" style="width:100.0000%">D/C<small>4拍</small></div></div></div><div class="mini" data-mi="33"><div class="mtop"><span class="mno">M34</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="34"><div class="mtop"><span class="mno">M35</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="35"><div class="mtop"><span class="mno">M36</span></div><div class="mchords"><div class="mc" style="width:100.0000%">F#m7<small>4拍</small></div></div></div><div class="mini" data-mi="36"><div class="mtop"><span class="mno">M37</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="37"><div class="mtop"><span class="mno">M38</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="38"><div class="mtop"><span class="mno">M39</span></div><div class="mchords"><div class="mc" style="width:100.0000%">G9<small>4拍</small></div></div></div><div class="mini" data-mi="39"><div class="mtop"><span class="mno">M40</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="40"><div class="mtop"><span class="mno">M41</span></div><div class="mchords"><div class="mc" style="width:100.0000%">D/C<small>4拍</small></div></div></div><div class="mini" data-mi="41"><div class="mtop"><span class="mno">M42</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="42"><div class="mtop"><span class="mno">M43</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="43"><div class="mtop"><span class="mno">M44</span></div><div class="mchords"><div class="mc" style="width:100.0000%">F#m11<small>4拍</small></div></div></div><div class="mini" data-mi="44"><div class="mtop"><span class="mno">M45</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="45"><div class="mtop"><span class="mno">M46</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="46"><div class="mtop"><span class="mno">M47</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="47"><div class="mtop"><span class="mno">M48</span></div><div class="mchords"><div class="mc" style="width:100.0000%">GM7<small>4拍</small></div></div></div><div class="mini" data-mi="48"><div class="mtop"><span class="mno">M49</span></div><div class="mchords"><div class="mc" style="width:100.0000%">GM7<small>4拍</small></div></div></div><div class="sec">Aメロ2</div><div class="mini" data-mi="49"><div class="mtop"><span class="mno">M50</span><span class="cue">2番歌入り</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="50"><div class="mtop"><span class="mno">M51</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Am7<small>2拍</small></div><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div></div></div><div class="mini" data-mi="51"><div class="mtop"><span class="mno">M52</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Em7<small>2拍</small></div><div class="mc" style="width:25.0000%">G7/D<small>1拍</small></div><div class="mc" style="width:25.0000%">CM7<small>1拍</small></div></div></div><div class="mini" data-mi="52"><div class="mtop"><span class="mno">M53</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div><div class="mc" style="width:50.0000%">Bb7<small>2拍</small></div></div></div><div class="mini" data-mi="53"><div class="mtop"><span class="mno">M54</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="54"><div class="mtop"><span class="mno">M55</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7<small>2拍</small></div><div class="mc" style="width:50.0000%">Baug7<small>2拍</small></div></div></div><div class="mini" data-mi="55"><div class="mtop"><span class="mno">M56</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="56"><div class="mtop"><span class="mno">M57</span></div><div class="mchords"><div class="mc" style="width:100.0000%">E9<small>4拍</small></div></div></div><div class="sec">Bメロ2</div><div class="mini" data-mi="57"><div class="mtop"><span class="mno">M58</span><span class="cue">Bメロ頭</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="58"><div class="mtop"><span class="mno">M59</span></div><div class="mchords"><div class="mc" style="width:50.0000%">CmM7<small>2拍</small></div><div class="mc" style="width:50.0000%">D9sus4<small>2拍</small></div></div></div><div class="mini" data-mi="59"><div class="mtop"><span class="mno">M60</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="60"><div class="mtop"><span class="mno">M61</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Dm7<small>2拍</small></div><div class="mc" style="width:25.0000%">D/E<small>1拍</small></div><div class="mc" style="width:25.0000%">E9<small>1拍</small></div></div></div><div class="mini" data-mi="61"><div class="mtop"><span class="mno">M62</span></div><div class="mchords"><div class="mc" style="width:100.0000%">C#m7-5<small>4拍</small></div></div></div><div class="mini" data-mi="62"><div class="mtop"><span class="mno">M63</span></div><div class="mchords"><div class="mc" style="width:50.0000%">F#7(b9)<small>2拍</small></div><div class="mc" style="width:50.0000%">F#7<small>2拍</small></div></div></div><div class="mini" data-mi="63"><div class="mtop"><span class="mno">M64</span></div><div class="mchords"><div class="mc" style="width:75.0000%">Bm7<small>3拍</small></div><div class="mc" style="width:25.0000%">F#(b9)/Bb<small>1拍</small></div></div></div><div class="mini" data-mi="64"><div class="mtop"><span class="mno">M65</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Am7<small>2拍</small></div><div class="mc" style="width:25.0000%">Baug7(#9)<small>1拍</small></div><div class="mc" style="width:25.0000%">B7<small>1拍</small></div></div></div><div class="sec">サビ2</div><div class="mini" data-mi="65"><div class="mtop"><span class="mno">M66</span><span class="cue">サビ頭</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="66"><div class="mtop"><span class="mno">M67</span></div><div class="mchords"><div class="mc" style="width:100.0000%">D/C<small>4拍</small></div></div></div><div class="mini" data-mi="67"><div class="mtop"><span class="mno">M68</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="68"><div class="mtop"><span class="mno">M69</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="69"><div class="mtop"><span class="mno">M70</span></div><div class="mchords"><div class="mc" style="width:100.0000%">F#m7<small>4拍</small></div></div></div><div class="mini" data-mi="70"><div class="mtop"><span class="mno">M71</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="71"><div class="mtop"><span class="mno">M72</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="72"><div class="mtop"><span class="mno">M73</span></div><div class="mchords"><div class="mc" style="width:100.0000%">G9<small>4拍</small></div></div></div><div class="mini" data-mi="73"><div class="mtop"><span class="mno">M74</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="74"><div class="mtop"><span class="mno">M75</span></div><div class="mchords"><div class="mc" style="width:100.0000%">D/C<small>4拍</small></div></div></div><div class="mini" data-mi="75"><div class="mtop"><span class="mno">M76</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="76"><div class="mtop"><span class="mno">M77</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="77"><div class="mtop"><span class="mno">M78</span></div><div class="mchords"><div class="mc" style="width:100.0000%">F#m11<small>4拍</small></div></div></div><div class="mini" data-mi="78"><div class="mtop"><span class="mno">M79</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="79"><div class="mtop"><span class="mno">M80</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="80"><div class="mtop"><span class="mno">M81</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="81"><div class="mtop"><span class="mno">M82</span></div><div class="mchords"><div class="mc" style="width:100.0000%">GM7<small>4拍</small></div></div></div><div class="mini" data-mi="82"><div class="mtop"><span class="mno">M83</span></div><div class="mchords"><div class="mc" style="width:100.0000%">GM7<small>4拍</small></div></div></div><div class="sec">間奏</div><div class="mini" data-mi="83"><div class="mtop"><span class="mno">M84</span><span class="cue">A.Guitar solo</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="84"><div class="mtop"><span class="mno">M85</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="85"><div class="mtop"><span class="mno">M86</span></div><div class="mchords"><div class="mc" style="width:100.0000%">GM7<small>4拍</small></div></div></div><div class="mini" data-mi="86"><div class="mtop"><span class="mno">M87</span></div><div class="mchords"><div class="mc" style="width:50.0000%">F#m7<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="87"><div class="mtop"><span class="mno">M88</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="88"><div class="mtop"><span class="mno">M89</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(b9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="89"><div class="mtop"><span class="mno">M90</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="90"><div class="mtop"><span class="mno">M91</span></div><div class="mchords"><div class="mc" style="width:50.0000%">A7(13)<small>2拍</small></div><div class="mc" style="width:50.0000%">A7<small>2拍</small></div></div></div><div class="mini" data-mi="91"><div class="mtop"><span class="mno">M92</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="92"><div class="mtop"><span class="mno">M93</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Baug7(b9)<small>4拍</small></div></div></div><div class="mini" data-mi="93"><div class="mtop"><span class="mno">M94</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Bm7/E<small>2拍</small></div><div class="mc" style="width:50.0000%">E7<small>2拍</small></div></div></div><div class="sec">ラスBメロ</div><div class="mini" data-mi="94"><div class="mtop"><span class="mno">M95</span><span class="cue">ラスBメロ頭</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="95"><div class="mtop"><span class="mno">M96</span></div><div class="mchords"><div class="mc" style="width:50.0000%">CmM7(13)<small>2拍</small></div><div class="mc" style="width:50.0000%">D9sus4<small>2拍</small></div></div></div><div class="mini" data-mi="96"><div class="mtop"><span class="mno">M97</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="97"><div class="mtop"><span class="mno">M98</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Dm7<small>2拍</small></div><div class="mc" style="width:25.0000%">D/E<small>1拍</small></div><div class="mc" style="width:25.0000%">E9<small>1拍</small></div></div></div><div class="mini" data-mi="98"><div class="mtop"><span class="mno">M99</span></div><div class="mchords"><div class="mc" style="width:100.0000%">C#m7-5<small>4拍</small></div></div></div><div class="mini" data-mi="99"><div class="mtop"><span class="mno">M100</span></div><div class="mchords"><div class="mc" style="width:50.0000%">F#7(b9)<small>2拍</small></div><div class="mc" style="width:50.0000%">F#7<small>2拍</small></div></div></div><div class="mini" data-mi="100"><div class="mtop"><span class="mno">M101</span></div><div class="mchords"><div class="mc" style="width:75.0000%">Bm7<small>3拍</small></div><div class="mc" style="width:25.0000%">F#(b9)/Bb<small>1拍</small></div></div></div><div class="mini" data-mi="101"><div class="mtop"><span class="mno">M102</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Am7<small>2拍</small></div><div class="mc" style="width:50.0000%">Baug7(b9)<small>2拍</small></div></div></div><div class="mini" data-mi="102"><div class="mtop"><span class="mno">M103</span><span class="cue">2/4 キメ</span></div><div class="mchords"><div class="mc" style="width:100.0000%">N.C.<small>2拍</small></div></div></div><div class="sec">ラスサビ</div><div class="mini" data-mi="103"><div class="mtop"><span class="mno">M104</span><span class="cue">ラスサビ頭</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="104"><div class="mtop"><span class="mno">M105</span></div><div class="mchords"><div class="mc" style="width:100.0000%">D/C<small>4拍</small></div></div></div><div class="mini" data-mi="105"><div class="mtop"><span class="mno">M106</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="106"><div class="mtop"><span class="mno">M107</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="107"><div class="mtop"><span class="mno">M108</span></div><div class="mchords"><div class="mc" style="width:100.0000%">F#m7<small>4拍</small></div></div></div><div class="mini" data-mi="108"><div class="mtop"><span class="mno">M109</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="109"><div class="mtop"><span class="mno">M110</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="110"><div class="mtop"><span class="mno">M111</span></div><div class="mchords"><div class="mc" style="width:100.0000%">G9<small>4拍</small></div></div></div><div class="mini" data-mi="111"><div class="mtop"><span class="mno">M112</span></div><div class="mchords"><div class="mc" style="width:100.0000%">CM7<small>4拍</small></div></div></div><div class="mini" data-mi="112"><div class="mtop"><span class="mno">M113</span></div><div class="mchords"><div class="mc" style="width:100.0000%">D/C<small>4拍</small></div></div></div><div class="mini" data-mi="113"><div class="mtop"><span class="mno">M114</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Bm7<small>4拍</small></div></div></div><div class="mini" data-mi="114"><div class="mtop"><span class="mno">M115</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em7<small>4拍</small></div></div></div><div class="mini" data-mi="115"><div class="mtop"><span class="mno">M116</span></div><div class="mchords"><div class="mc" style="width:100.0000%">F#m11<small>4拍</small></div></div></div><div class="mini" data-mi="116"><div class="mtop"><span class="mno">M117</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Baug7(#9)<small>2拍</small></div><div class="mc" style="width:50.0000%">B7<small>2拍</small></div></div></div><div class="mini" data-mi="117"><div class="mtop"><span class="mno">M118</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Em7<small>2拍</small></div><div class="mc" style="width:50.0000%">G9(13)<small>2拍</small></div></div></div><div class="mini" data-mi="118"><div class="mtop"><span class="mno">M119</span></div><div class="mchords"><div class="mc" style="width:50.0000%">CM9<small>2拍</small></div><div class="mc" style="width:25.0000%">F#m7/B<small>1拍</small></div><div class="mc" style="width:25.0000%">B7<small>1拍</small></div></div></div><div class="mini" data-mi="119"><div class="mtop"><span class="mno">M120</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="120"><div class="mtop"><span class="mno">M121</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Baug7<small>4拍</small></div></div></div><div class="mini" data-mi="121"><div class="mtop"><span class="mno">M122</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="mini" data-mi="122"><div class="mtop"><span class="mno">M123</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Em9<small>4拍</small></div></div></div><div class="sec">Outro</div><div class="mini" data-mi="123"><div class="mtop"><span class="mno">M124</span><span class="cue">Gt. only</span></div><div class="mchords"><div class="mc" style="width:100.0000%">Am7<small>4拍</small></div></div></div><div class="mini" data-mi="124"><div class="mtop"><span class="mno">M125</span></div><div class="mchords"><div class="mc" style="width:50.0000%">Cm6<small>2拍</small></div><div class="mc" style="width:50.0000%">D9<small>2拍</small></div></div></div><div class="mini" data-mi="125"><div class="mtop"><span class="mno">M126</span><span class="cue">エンディング</span></div><div class="mchords"><div class="mc" style="width:100.0000%">GM7<small>4拍</small></div></div></div>
+ </div>
+</main>
+
+<div class="bottom">
+ <div class="songbar"><i id="songbar"></i></div>
+ <div class="brow"><span id="time">00:00</span><span id="stamp">v12 PoC</span></div>
+</div>
+</div>
+
+<button class="scrim" id="scrim" type="button" aria-label="閉じる"></button>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+ <div class="sheetHead"><div class="sheetTitle" id="sheetTitle">コードフォーム</div>
+  <button class="closeBtn" id="closeSheet" type="button" aria-label="閉じる">&times;</button></div>
+ <div class="sheetNote">表示するフォームを選びます。選択は同じコード名の全出現箇所に適用され、この端末に保存されます。<br>
+  掲載フォームは構成音を機械検証済み（押弦4本以内・4フレット幅以内）。</div>
+ <div id="voiceOptions"></div>
+</div>
+
+<script>
+window.onerror = function(msg, url, line, col){
+  try{
+    var b = document.getElementById('errbox');
+    b.style.display = 'block';
+    b.textContent = 'JSエラー: ' + msg + ' (行' + line + ':' + col + ')';
+    var e1 = document.getElementById('b1');
+    e1.className = 'badge ng'; e1.textContent = 'NG';
+  }catch(e){}
+  return false;
+};
+(function(){
+"use strict";
+var measures = [{"section": "Intro", "chords": [["CM7", 4]], "cue": "イントロ", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Intro", "chords": [["Baug7(b9)", 2], ["B7", 2]], "cue": "", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Intro", "chords": [["Em9", 4]], "cue": "", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Intro", "chords": [["A7(13)", 2], ["A7", 2]], "cue": "", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Intro", "chords": [["CM7", 4]], "cue": "", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Intro", "chords": [["Dsus4/B", 2], ["Baug7(#9)", 2]], "cue": "", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Intro", "chords": [["Em9", 4]], "cue": "", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Intro", "chords": [["N.C.", 2], ["F9", 2]], "cue": "歌入り直前", "lyric": "Intro（歌詞位置）", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Em9", 4]], "cue": "歌入り", "lyric": "Aメロ1・1小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Am7", 2], ["Bm7", 2]], "cue": "", "lyric": "Aメロ1・2小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Em7", 2], ["G7/D", 1], ["CM7", 1]], "cue": "", "lyric": "Aメロ1・3小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Bm7", 2], ["Bb7", 2]], "cue": "", "lyric": "Aメロ1・4小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Am7", 4]], "cue": "", "lyric": "Aメロ1・5小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Bm7", 2], ["Baug7", 2]], "cue": "", "lyric": "Aメロ1・6小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Em9", 4]], "cue": "", "lyric": "Aメロ1・7小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["N.C.", 2], ["F9", 2]], "cue": "", "lyric": "Aメロ1・8小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Em9", 4]], "cue": "", "lyric": "Aメロ1・9小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Am7", 2], ["Bm7", 2]], "cue": "", "lyric": "Aメロ1・10小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Em7", 2], ["G9(13)", 1], ["CM7", 1]], "cue": "", "lyric": "Aメロ1・11小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Bm7", 2], ["Bb7", 2]], "cue": "", "lyric": "Aメロ1・12小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Am7", 4]], "cue": "", "lyric": "Aメロ1・13小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Bm7", 2], ["Baug7", 2]], "cue": "", "lyric": "Aメロ1・14小節", "meter": "4/4"}, {"section": "Aメロ1", "chords": [["Bm7/E", 2], ["E7", 2]], "cue": "", "lyric": "Aメロ1・15小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["Am7", 4]], "cue": "Bメロ頭", "lyric": "Bメロ1・1小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["CmM7(13)", 2], ["D9sus4", 2]], "cue": "", "lyric": "Bメロ1・2小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["Bm7", 4]], "cue": "", "lyric": "Bメロ1・3小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["Dm7", 2], ["D/E", 1], ["E9", 1]], "cue": "", "lyric": "Bメロ1・4小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["C#m7-5", 4]], "cue": "", "lyric": "Bメロ1・5小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["F#7(b9)", 2], ["F#7", 2]], "cue": "", "lyric": "Bメロ1・6小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["Bm7", 3], ["F#(b9)/Bb", 1]], "cue": "", "lyric": "Bメロ1・7小節", "meter": "4/4"}, {"section": "Bメロ1", "chords": [["Am7", 2], ["Baug7(#9)", 2]], "cue": "", "lyric": "Bメロ1・8小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["CM7", 4]], "cue": "サビ頭", "lyric": "サビ1・1小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["D/C", 4]], "cue": "", "lyric": "サビ1・2小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["Bm7", 4]], "cue": "", "lyric": "サビ1・3小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["Em7", 4]], "cue": "", "lyric": "サビ1・4小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["F#m7", 4]], "cue": "", "lyric": "サビ1・5小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["Baug7(#9)", 2], ["B7", 2]], "cue": "", "lyric": "サビ1・6小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["Em7", 4]], "cue": "", "lyric": "サビ1・7小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["G9", 4]], "cue": "", "lyric": "サビ1・8小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["CM7", 4]], "cue": "", "lyric": "サビ1・9小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["D/C", 4]], "cue": "", "lyric": "サビ1・10小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["Bm7", 4]], "cue": "", "lyric": "サビ1・11小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["Em7", 4]], "cue": "", "lyric": "サビ1・12小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["F#m11", 4]], "cue": "", "lyric": "サビ1・13小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["Baug7(#9)", 2], ["B7", 2]], "cue": "", "lyric": "サビ1・14小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["CM7", 4]], "cue": "", "lyric": "サビ1・15小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["CM7", 4]], "cue": "", "lyric": "サビ1・16小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["GM7", 4]], "cue": "", "lyric": "サビ1・17小節", "meter": "4/4"}, {"section": "サビ1", "chords": [["GM7", 4]], "cue": "", "lyric": "サビ1・18小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["Em9", 4]], "cue": "2番歌入り", "lyric": "Aメロ2・1小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["Am7", 2], ["Bm7", 2]], "cue": "", "lyric": "Aメロ2・2小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["Em7", 2], ["G7/D", 1], ["CM7", 1]], "cue": "", "lyric": "Aメロ2・3小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["Bm7", 2], ["Bb7", 2]], "cue": "", "lyric": "Aメロ2・4小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["Am7", 4]], "cue": "", "lyric": "Aメロ2・5小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["Bm7", 2], ["Baug7", 2]], "cue": "", "lyric": "Aメロ2・6小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["Em9", 4]], "cue": "", "lyric": "Aメロ2・7小節", "meter": "4/4"}, {"section": "Aメロ2", "chords": [["E9", 4]], "cue": "", "lyric": "Aメロ2・8小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["Am7", 4]], "cue": "Bメロ頭", "lyric": "Bメロ2・1小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["CmM7", 2], ["D9sus4", 2]], "cue": "", "lyric": "Bメロ2・2小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["Bm7", 4]], "cue": "", "lyric": "Bメロ2・3小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["Dm7", 2], ["D/E", 1], ["E9", 1]], "cue": "", "lyric": "Bメロ2・4小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["C#m7-5", 4]], "cue": "", "lyric": "Bメロ2・5小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["F#7(b9)", 2], ["F#7", 2]], "cue": "", "lyric": "Bメロ2・6小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["Bm7", 3], ["F#(b9)/Bb", 1]], "cue": "", "lyric": "Bメロ2・7小節", "meter": "4/4"}, {"section": "Bメロ2", "chords": [["Am7", 2], ["Baug7(#9)", 1], ["B7", 1]], "cue": "", "lyric": "Bメロ2・8小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["CM7", 4]], "cue": "サビ頭", "lyric": "サビ2・1小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["D/C", 4]], "cue": "", "lyric": "サビ2・2小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["Bm7", 4]], "cue": "", "lyric": "サビ2・3小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["Em7", 4]], "cue": "", "lyric": "サビ2・4小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["F#m7", 4]], "cue": "", "lyric": "サビ2・5小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["Baug7(#9)", 2], ["B7", 2]], "cue": "", "lyric": "サビ2・6小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["Em7", 4]], "cue": "", "lyric": "サビ2・7小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["G9", 4]], "cue": "", "lyric": "サビ2・8小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["CM7", 4]], "cue": "", "lyric": "サビ2・9小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["D/C", 4]], "cue": "", "lyric": "サビ2・10小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["Bm7", 4]], "cue": "", "lyric": "サビ2・11小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["Em7", 4]], "cue": "", "lyric": "サビ2・12小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["F#m11", 4]], "cue": "", "lyric": "サビ2・13小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["Baug7(#9)", 2], ["B7", 2]], "cue": "", "lyric": "サビ2・14小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["CM7", 4]], "cue": "", "lyric": "サビ2・15小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["CM7", 4]], "cue": "", "lyric": "サビ2・16小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["GM7", 4]], "cue": "", "lyric": "サビ2・17小節", "meter": "4/4"}, {"section": "サビ2", "chords": [["GM7", 4]], "cue": "", "lyric": "サビ2・18小節", "meter": "4/4"}, {"section": "間奏", "chords": [["CM7", 4]], "cue": "A.Guitar solo", "lyric": "間奏・1小節", "meter": "4/4"}, {"section": "間奏", "chords": [["CM7", 4]], "cue": "", "lyric": "間奏・2小節", "meter": "4/4"}, {"section": "間奏", "chords": [["GM7", 4]], "cue": "", "lyric": "間奏・3小節", "meter": "4/4"}, {"section": "間奏", "chords": [["F#m7", 2], ["B7", 2]], "cue": "", "lyric": "間奏・4小節", "meter": "4/4"}, {"section": "間奏", "chords": [["CM7", 4]], "cue": "", "lyric": "間奏・5小節", "meter": "4/4"}, {"section": "間奏", "chords": [["Baug7(b9)", 2], ["B7", 2]], "cue": "", "lyric": "間奏・6小節", "meter": "4/4"}, {"section": "間奏", "chords": [["Em9", 4]], "cue": "", "lyric": "間奏・7小節", "meter": "4/4"}, {"section": "間奏", "chords": [["A7(13)", 2], ["A7", 2]], "cue": "", "lyric": "間奏・8小節", "meter": "4/4"}, {"section": "間奏", "chords": [["CM7", 4]], "cue": "", "lyric": "間奏・9小節", "meter": "4/4"}, {"section": "間奏", "chords": [["Baug7(b9)", 4]], "cue": "", "lyric": "間奏・10小節", "meter": "4/4"}, {"section": "間奏", "chords": [["Bm7/E", 2], ["E7", 2]], "cue": "", "lyric": "間奏・11小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["Am7", 4]], "cue": "ラスBメロ頭", "lyric": "ラスBメロ・1小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["CmM7(13)", 2], ["D9sus4", 2]], "cue": "", "lyric": "ラスBメロ・2小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["Bm7", 4]], "cue": "", "lyric": "ラスBメロ・3小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["Dm7", 2], ["D/E", 1], ["E9", 1]], "cue": "", "lyric": "ラスBメロ・4小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["C#m7-5", 4]], "cue": "", "lyric": "ラスBメロ・5小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["F#7(b9)", 2], ["F#7", 2]], "cue": "", "lyric": "ラスBメロ・6小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["Bm7", 3], ["F#(b9)/Bb", 1]], "cue": "", "lyric": "ラスBメロ・7小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["Am7", 2], ["Baug7(b9)", 2]], "cue": "", "lyric": "ラスBメロ・8小節", "meter": "4/4"}, {"section": "ラスBメロ", "chords": [["N.C.", 2]], "cue": "2/4 キメ", "lyric": "2/4ブレイク", "meter": "2/4"}, {"section": "ラスサビ", "chords": [["CM7", 4]], "cue": "ラスサビ頭", "lyric": "ラスサビ・1小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["D/C", 4]], "cue": "", "lyric": "ラスサビ・2小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Bm7", 4]], "cue": "", "lyric": "ラスサビ・3小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Em7", 4]], "cue": "", "lyric": "ラスサビ・4小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["F#m7", 4]], "cue": "", "lyric": "ラスサビ・5小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Baug7(#9)", 2], ["B7", 2]], "cue": "", "lyric": "ラスサビ・6小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Em7", 4]], "cue": "", "lyric": "ラスサビ・7小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["G9", 4]], "cue": "", "lyric": "ラスサビ・8小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["CM7", 4]], "cue": "", "lyric": "ラスサビ・9小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["D/C", 4]], "cue": "", "lyric": "ラスサビ・10小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Bm7", 4]], "cue": "", "lyric": "ラスサビ・11小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Em7", 4]], "cue": "", "lyric": "ラスサビ・12小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["F#m11", 4]], "cue": "", "lyric": "ラスサビ・13小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Baug7(#9)", 2], ["B7", 2]], "cue": "", "lyric": "ラスサビ・14小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Em7", 2], ["G9(13)", 2]], "cue": "", "lyric": "ラスサビ・15小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["CM9", 2], ["F#m7/B", 1], ["B7", 1]], "cue": "", "lyric": "ラスサビ・16小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Am7", 4]], "cue": "", "lyric": "ラスサビ・17小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Baug7", 4]], "cue": "", "lyric": "ラスサビ・18小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Em9", 4]], "cue": "", "lyric": "ラスサビ・19小節", "meter": "4/4"}, {"section": "ラスサビ", "chords": [["Em9", 4]], "cue": "", "lyric": "ラスサビ・20小節", "meter": "4/4"}, {"section": "Outro", "chords": [["Am7", 4]], "cue": "Gt. only", "lyric": "アウトロ1", "meter": "4/4"}, {"section": "Outro", "chords": [["Cm6", 2], ["D9", 2]], "cue": "", "lyric": "アウトロ2", "meter": "4/4"}, {"section": "Outro", "chords": [["GM7", 4]], "cue": "エンディング", "lyric": "アウトロ3", "meter": "4/4"}];
+var voicings = {"A7": [{"name": "2F ミドル", "form": "x02020", "src": "定番形", "strings": 5, "fingers": 2, "notes": "A E G C# E"}, {"name": "5F ハイ", "form": "575655", "src": "定番形", "strings": 6, "fingers": 3, "notes": "A E G C# E A"}, {"name": "7F ハイ", "form": "xx7989", "src": "探索", "strings": 4, "fingers": 4, "notes": "A E G C#"}], "A7(13)": [{"name": "2F ミドル", "form": "x02022", "src": "定番形", "strings": 5, "fingers": 3, "notes": "A E G C# F#"}, {"name": "5F ハイ", "form": "575675", "src": "定番形", "strings": 6, "fingers": 4, "notes": "A E G C# F# A"}], "Am7": [{"name": "1F ロー", "form": "x02010", "src": "定番形", "strings": 5, "fingers": 2, "notes": "A E G C E"}, {"name": "5F ハイ", "form": "575555", "src": "定番形", "strings": 6, "fingers": 2, "notes": "A E G C E A"}, {"name": "3F ミドル", "form": "5350xx", "src": "探索", "strings": 4, "fingers": 3, "notes": "A C G G"}], "B7": [{"name": "1F ロー", "form": "x21202", "src": "定番形", "strings": 5, "fingers": 4, "notes": "B D# A B F#"}, {"name": "7F ハイ", "form": "797877", "src": "定番形", "strings": 6, "fingers": 3, "notes": "B F# A D# F# B"}, {"name": "4F ミドル", "form": "764445", "src": "探索", "strings": 6, "fingers": 4, "notes": "B D# F# B D# A"}], "Baug7": [{"name": "1F ロー", "form": "x21203", "src": "定番形", "strings": 5, "fingers": 4, "notes": "B D# A B G"}, {"name": "7F ハイ", "form": "7-10-7-8-8-7", "src": "定番形", "strings": 6, "fingers": 4, "notes": "B G A D# G B"}, {"name": "4F ミドル", "form": "70504x", "src": "探索", "strings": 5, "fingers": 3, "notes": "B A G G D#"}], "Baug7(#9)": [{"name": "4F ミドル", "form": "70004x", "src": "探索", "strings": 5, "fingers": 2, "notes": "B A D G D#"}, {"name": "2F ミドル", "form": "x20045", "src": "探索", "strings": 5, "fingers": 3, "notes": "B D G D# A"}], "Baug7(b9)": [{"name": "1F ロー", "form": "x21213", "src": "定番形", "strings": 5, "fingers": 4, "notes": "B D# A C G"}, {"name": "4F ミドル", "form": "70554x", "src": "探索", "strings": 5, "fingers": 4, "notes": "B A G C D#"}], "Bb7": [{"name": "1F ロー", "form": "x13131", "src": "定番形", "strings": 5, "fingers": 3, "notes": "A# F G# D F"}, {"name": "6F ハイ", "form": "686766", "src": "定番形", "strings": 6, "fingers": 3, "notes": "A# F G# D F A#"}, {"name": "3F ミドル", "form": "653334", "src": "探索", "strings": 6, "fingers": 4, "notes": "A# D F A# D G#"}], "Bm7": [{"name": "2F ミドル", "form": "x24232", "src": "定番形", "strings": 5, "fingers": 3, "notes": "B F# A D F#"}, {"name": "7F ハイ", "form": "797777", "src": "定番形", "strings": 6, "fingers": 2, "notes": "B F# A D F# B"}, {"name": "4F ミドル", "form": "70040x", "src": "探索", "strings": 5, "fingers": 2, "notes": "B A D B B"}], "Bm7/E": [{"name": "2F ミドル", "form": "000202", "src": "定番形", "strings": 6, "fingers": 2, "notes": "E A D A B F#"}, {"name": "4F ミドル", "form": "000400", "src": "探索", "strings": 6, "fingers": 1, "notes": "E A D B B E"}, {"name": "7F ハイ", "form": "x77777", "src": "探索", "strings": 5, "fingers": 1, "notes": "E A D F# B"}], "C#m7-5": [{"name": "4F ミドル", "form": "x45450", "src": "定番形", "strings": 5, "fingers": 4, "notes": "C# G B E E"}, {"name": "9F ハイ", "form": "9-10-9-9-x-x", "src": "定番形", "strings": 4, "fingers": 4, "notes": "C# G B E"}, {"name": "2F ミドル", "form": "x42000", "src": "探索", "strings": 5, "fingers": 2, "notes": "C# E G B E"}], "CM7": [{"name": "2F ミドル", "form": "x32000", "src": "定番形", "strings": 5, "fingers": 2, "notes": "C E G B E"}, {"name": "8F ハイ", "form": "8-10-9-9-8-8", "src": "定番形", "strings": 6, "fingers": 4, "notes": "C G B E G C"}, {"name": "10F ハイ", "form": "x-x-10-12-12-12", "src": "定番形", "strings": 4, "fingers": 4, "notes": "C G B E"}], "CM9": [{"name": "3F ミドル", "form": "x30000", "src": "定番形", "strings": 5, "fingers": 1, "notes": "C D G B E"}, {"name": "1F ロー", "form": "x30410", "src": "探索", "strings": 5, "fingers": 3, "notes": "C D B C E"}, {"name": "5F ハイ", "form": "855557", "src": "探索", "strings": 6, "fingers": 3, "notes": "C D G C E B"}], "Cm6": [{"name": "1F ロー", "form": "x31213", "src": "定番形", "strings": 5, "fingers": 4, "notes": "C D# A C G"}, {"name": "7F ハイ", "form": "8x788x", "src": "定番形", "strings": 4, "fingers": 4, "notes": "C A D# G"}, {"name": "3F ミドル", "form": "x35045", "src": "探索", "strings": 5, "fingers": 4, "notes": "C G G D# A"}], "CmM7": [{"name": "1F ロー", "form": "x31003", "src": "定番形", "strings": 5, "fingers": 3, "notes": "C D# G B G"}, {"name": "3F ミドル", "form": "x35443", "src": "定番形", "strings": 5, "fingers": 4, "notes": "C G B D# G"}, {"name": "8F ハイ", "form": "8-10-9-8-8-8", "src": "定番形", "strings": 6, "fingers": 3, "notes": "C G B D# G C"}], "CmM7(13)": [{"name": "1F ロー", "form": "x31203", "src": "定番形", "strings": 5, "fingers": 4, "notes": "C D# A B G"}, {"name": "8F ハイ", "form": "8-10-9-8-10-8", "src": "定番形", "strings": 6, "fingers": 4, "notes": "C G B D# A C"}], "D/C": [{"name": "2F ミドル", "form": "x30232", "src": "定番形", "strings": 5, "fingers": 4, "notes": "C D A D F#"}, {"name": "7F ハイ", "form": "8x777x", "src": "定番形", "strings": 4, "fingers": 4, "notes": "C A D F#"}, {"name": "10F ハイ", "form": "x-x-10-11-10-10", "src": "探索", "strings": 4, "fingers": 4, "notes": "C F# A D"}], "D/E": [{"name": "2F ミドル", "form": "000232", "src": "定番形", "strings": 6, "fingers": 3, "notes": "E A D A D F#"}, {"name": "10F ハイ", "form": "0-x-0-11-10-10", "src": "定番形", "strings": 5, "fingers": 3, "notes": "E D F# A D"}, {"name": "5F ハイ", "form": "0x0775", "src": "定番形", "strings": 5, "fingers": 3, "notes": "E D D F# A"}], "D9": [{"name": "4F ミドル", "form": "x5455x", "src": "定番形", "strings": 4, "fingers": 4, "notes": "D F# C E"}, {"name": "10F ハイ", "form": "10-x-10-11-10-12", "src": "定番形", "strings": 5, "fingers": 3, "notes": "D C F# A E"}, {"name": "2F ミドル", "form": "xx0552", "src": "探索", "strings": 4, "fingers": 3, "notes": "D C E F#"}], "D9sus4": [{"name": "5F ハイ", "form": "x55555", "src": "定番形", "strings": 5, "fingers": 1, "notes": "D G C E A"}, {"name": "1F ロー", "form": "xx0010", "src": "探索", "strings": 4, "fingers": 1, "notes": "D G C E"}, {"name": "3F ミドル", "form": "xx0553", "src": "探索", "strings": 4, "fingers": 3, "notes": "D C E G"}], "Dm7": [{"name": "1F ロー", "form": "xx0211", "src": "定番形", "strings": 4, "fingers": 3, "notes": "D A C F"}, {"name": "10F ハイ", "form": "10-12-10-10-10-10", "src": "定番形", "strings": 6, "fingers": 2, "notes": "D A C F A D"}, {"name": "5F ハイ", "form": "x57565", "src": "定番形", "strings": 5, "fingers": 3, "notes": "D A C F A"}], "Dsus4/B": [{"name": "2F ミドル", "form": "x20033", "src": "定番形", "strings": 5, "fingers": 3, "notes": "B D G D G"}, {"name": "7F ハイ", "form": "7x778x", "src": "定番形", "strings": 4, "fingers": 4, "notes": "B A D G"}, {"name": "4F ミドル", "form": "75540x", "src": "探索", "strings": 5, "fingers": 4, "notes": "B D G B B"}], "E7": [{"name": "1F ロー", "form": "020100", "src": "定番形", "strings": 6, "fingers": 2, "notes": "E B D G# B E"}, {"name": "6F ハイ", "form": "076700", "src": "定番形", "strings": 6, "fingers": 3, "notes": "E E G# D B E"}, {"name": "4F ミドル", "form": "050404", "src": "探索", "strings": 6, "fingers": 3, "notes": "E D D B B G#"}], "E9": [{"name": "1F ロー", "form": "020102", "src": "定番形", "strings": 6, "fingers": 3, "notes": "E B D G# B F#"}, {"name": "6F ハイ", "form": "076770", "src": "定番形", "strings": 6, "fingers": 4, "notes": "E E G# D F# E"}, {"name": "4F ミドル", "form": "054404", "src": "探索", "strings": 6, "fingers": 4, "notes": "E D F# B B G#"}], "Em7": [{"name": "2F ミドル", "form": "020000", "src": "定番形", "strings": 6, "fingers": 1, "notes": "E B D G B E"}, {"name": "7F ハイ", "form": "x79787", "src": "定番形", "strings": 5, "fingers": 3, "notes": "E B D G B"}, {"name": "4F ミドル", "form": "055400", "src": "探索", "strings": 6, "fingers": 3, "notes": "E D G B B E"}], "Em9": [{"name": "2F ミドル", "form": "020002", "src": "定番形", "strings": 6, "fingers": 2, "notes": "E B D G B F#"}, {"name": "5F ハイ", "form": "x7577x", "src": "定番形", "strings": 4, "fingers": 4, "notes": "E G D F#"}, {"name": "10F ハイ", "form": "12-10-12-11-x-x", "src": "探索", "strings": 4, "fingers": 4, "notes": "E G D F#"}], "F#(b9)/Bb": [{"name": "1F ロー", "form": "x1402x", "src": "探索", "strings": 4, "fingers": 3, "notes": "A# F# G C#"}, {"name": "4F ミドル", "form": "6440xx", "src": "探索", "strings": 4, "fingers": 3, "notes": "A# C# F# G"}, {"name": "6F ハイ", "form": "698686", "src": "探索", "strings": 6, "fingers": 4, "notes": "A# F# A# C# G A#"}], "F#7": [{"name": "2F ミドル", "form": "242322", "src": "定番形", "strings": 6, "fingers": 3, "notes": "F# C# E A# C# F#"}, {"name": "4F ミドル", "form": "xx4656", "src": "探索", "strings": 4, "fingers": 4, "notes": "F# C# E A#"}, {"name": "9F ハイ", "form": "x-9-11-9-11-9", "src": "探索", "strings": 5, "fingers": 3, "notes": "F# C# E A# C#"}], "F#7(b9)": [{"name": "2F ミドル", "form": "2x2323", "src": "定番形", "strings": 5, "fingers": 3, "notes": "F# E A# C# G"}, {"name": "8F ハイ", "form": "x98989", "src": "定番形", "strings": 5, "fingers": 4, "notes": "F# A# E G C#"}, {"name": "4F ミドル", "form": "xx4056", "src": "探索", "strings": 4, "fingers": 3, "notes": "F# G E A#"}], "F#m11": [{"name": "2F ミドル", "form": "222222", "src": "定番形", "strings": 6, "fingers": 1, "notes": "F# B E A C# F#"}, {"name": "4F ミドル", "form": "xx4455", "src": "探索", "strings": 4, "fingers": 4, "notes": "F# B E A"}, {"name": "9F ハイ", "form": "x-9-9-9-10-9", "src": "探索", "strings": 5, "fingers": 2, "notes": "F# B E A C#"}], "F#m7": [{"name": "2F ミドル", "form": "242222", "src": "定番形", "strings": 6, "fingers": 2, "notes": "F# C# E A C# F#"}, {"name": "9F ハイ", "form": "x-9-11-9-10-9", "src": "定番形", "strings": 5, "fingers": 3, "notes": "F# C# E A C#"}, {"name": "4F ミドル", "form": "xx4655", "src": "探索", "strings": 4, "fingers": 4, "notes": "F# C# E A"}], "F#m7/B": [{"name": "2F ミドル", "form": "x22222", "src": "定番形", "strings": 5, "fingers": 1, "notes": "B E A C# F#"}, {"name": "7F ハイ", "form": "7979xx", "src": "定番形", "strings": 4, "fingers": 4, "notes": "B F# A E"}, {"name": "4F ミドル", "form": "704400", "src": "探索", "strings": 6, "fingers": 3, "notes": "B A F# B B E"}], "F9": [{"name": "1F ロー", "form": "1x1213", "src": "定番形", "strings": 5, "fingers": 3, "notes": "F D# A C G"}, {"name": "3F ミドル", "form": "xx3045", "src": "探索", "strings": 4, "fingers": 3, "notes": "F G D# A"}, {"name": "7F ハイ", "form": "x8788x", "src": "探索", "strings": 4, "fingers": 4, "notes": "F A D# G"}], "G7/D": [{"name": "1F ロー", "form": "xx0001", "src": "定番形", "strings": 4, "fingers": 1, "notes": "D G B F"}, {"name": "3F ミドル", "form": "x53433", "src": "定番形", "strings": 5, "fingers": 3, "notes": "D F B D G"}, {"name": "10F ハイ", "form": "10-10-12-10-12-10", "src": "探索", "strings": 6, "fingers": 3, "notes": "D G D F B D"}], "G9": [{"name": "3F ミドル", "form": "3x3435", "src": "定番形", "strings": 5, "fingers": 3, "notes": "G F B D A"}, {"name": "1F ロー", "form": "300001", "src": "探索", "strings": 6, "fingers": 2, "notes": "G A D G B F"}, {"name": "9F ハイ", "form": "x-10-9-10-10-x", "src": "探索", "strings": 4, "fingers": 4, "notes": "G B F A"}], "G9(13)": [{"name": "3F ミドル", "form": "3x3455", "src": "定番形", "strings": 5, "fingers": 4, "notes": "G F B E A"}, {"name": "1F ロー", "form": "302001", "src": "探索", "strings": 6, "fingers": 3, "notes": "G A E G B F"}], "GM7": [{"name": "2F ミドル", "form": "320002", "src": "定番形", "strings": 6, "fingers": 3, "notes": "G B D G B F#"}, {"name": "10F ハイ", "form": "x-10-12-11-12-x", "src": "定番形", "strings": 4, "fingers": 4, "notes": "G D F# B"}, {"name": "4F ミドル", "form": "xx5477", "src": "探索", "strings": 4, "fingers": 4, "notes": "G B F# B"}]};
+var STORE_PREFIX = 'aliens.voicing.';
+var STAMP_KEY = 'aliens.savedAt';
+
+/* ---------- 保存 ---------- */
+var store = (function(){
+  var mem = {}, usable = false;
+  try{
+    localStorage.setItem('__t__','1');
+    usable = (localStorage.getItem('__t__') === '1');
+    localStorage.removeItem('__t__');
+  }catch(e){ usable = false; }
+  return {
+    usable: function(){ return usable; },
+    get: function(k){
+      try{ return usable ? localStorage.getItem(k) : (mem.hasOwnProperty(k) ? mem[k] : null); }
+      catch(e){ return mem.hasOwnProperty(k) ? mem[k] : null; }
+    },
+    set: function(k,v){
+      v = String(v); mem[k] = v;
+      if(usable){ try{ localStorage.setItem(k,v); }catch(e){} }
+    },
+    keys: function(){
+      var out = [], i, k;
+      if(usable){
+        try{
+          for(i=0;i<localStorage.length;i++){
+            k = localStorage.key(i);
+            if(k && k.indexOf(STORE_PREFIX) === 0){ out.push(k); }
+          }
+          return out;
+        }catch(e){}
+      }
+      for(k in mem){ if(mem.hasOwnProperty(k) && k.indexOf(STORE_PREFIX) === 0){ out.push(k); } }
+      return out;
+    },
+    clearAll: function(){
+      var ks = this.keys(), i;
+      for(i=0;i<ks.length;i++){
+        delete mem[ks[i]];
+        if(usable){ try{ localStorage.removeItem(ks[i]); }catch(e){} }
+      }
+      delete mem[STAMP_KEY];
+      if(usable){ try{ localStorage.removeItem(STAMP_KEY); }catch(e){} }
+    }
+  };
+})();
+
+/* ---------- 選択状態 ---------- */
+var selected = {};
+var restored = [];
+(function(){
+  var ks = store.keys(), i, chord, raw, n;
+  for(i=0;i<ks.length;i++){
+    chord = ks[i].substring(STORE_PREFIX.length);
+    if(!voicings.hasOwnProperty(chord)) { continue; }
+    raw = store.get(ks[i]);
+    n = parseInt(raw, 10);
+    if(isNaN(n) || n < 0 || n >= voicings[chord].length){ continue; }
+    selected[chord] = n;
+    if(n !== 0){ restored.push(chord + ' → ' + voicings[chord][n].form); }
+  }
+})();
+function sel(chord){ return selected.hasOwnProperty(chord) ? selected[chord] : 0; }
+
+/* ---------- ダイアグラム ---------- */
+function parseForm(form){
+  var parts = (form.indexOf('-') >= 0) ? form.split('-') : form.split('');
+  var out = [], i, p, n;
+  if(parts.length !== 6){ return null; }
+  for(i=0;i<6;i++){
+    p = parts[i];
+    if(p === 'x' || p === 'X'){ out.push('x'); continue; }
+    n = parseInt(p, 10);
+    if(isNaN(n) || n < 0 || n > 24){ return null; }
+    out.push(n);
+  }
+  return out;
+}
+function diagram(form){
+  var vals = parseForm(form), i, v, rows, fretted = [], start, html = '', pct, mark, dot;
+  if(!vals){ return '<div class="noDiagram">フォーム表記エラー</div>'; }
+  for(i=0;i<6;i++){ if(vals[i] !== 'x' && vals[i] > 0){ fretted.push(vals[i]); } }
+  start = fretted.length ? Math.min.apply(null, fretted) : 1;
+  if(fretted.length && (Math.max.apply(null, fretted) - start) > 4){
+    start = Math.max(1, Math.max.apply(null, fretted) - 4);
+  }
+  rows = vals.slice(0).reverse();   /* 1弦を上に */
+  for(i=0;i<6;i++){
+    v = rows[i]; mark = ''; dot = '';
+    if(v === 'x'){ mark = '\u00d7'; }
+    else if(v === 0){ mark = '\u25cb'; }
+    else {
+      pct = ((v - start + 0.5) / 5) * 100;
+      dot = '<span class="dot" style="left:' + pct.toFixed(2) + '%"></span>';
+    }
+    html += '<div class="sRow"><div class="sLab">' + (i+1) + ' ' + mark + '</div>'
+          + '<div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div>'
+          + dot + '</div></div>';
+  }
+  html += '<div class="fretNo">' + (fretted.length ? start : 1) + 'F\u301c</div>';
+  return '<div class="' + ((!fretted.length || start === 1) ? 'dg nut' : 'dg') + '">' + html + '</div>';
+}
+
+/* ---------- 進行データ ---------- */
+var seq = [], mi, ci, mm;
+for(mi=0;mi<measures.length;mi++){
+  mm = measures[mi];
+  for(ci=0;ci<mm.chords.length;ci++){
+    seq.push({mi:mi, chord:mm.chords[ci][0], beats:mm.chords[ci][1]});
+  }
+}
+var BPM = 85, BEATMS = 60000 / BPM;
+var totalBeats = 0;
+for(mi=0;mi<seq.length;mi++){ totalBeats += seq[mi].beats; }
+var duration = totalBeats * BEATMS;
+
+/* ---------- カード ---------- */
+var cards = {
+  current: document.querySelector('.card.current'),
+  next: document.querySelector('.card.next'),
+  after: document.querySelector('.card.after')
+};
+function renderCard(el, chord){
+  var opts = voicings[chord], v;
+  el.setAttribute('data-chord', chord);
+  el.querySelector('.chord').textContent = chord;
+  if(opts && opts.length){
+    v = opts[sel(chord)];
+    el.querySelector('.form').textContent = v.form;
+    el.querySelector('.diagram').innerHTML = diagram(v.form);
+    el.querySelector('.tapmark').textContent = 'タップで変更（' + opts.length + '種）';
+  } else {
+    el.querySelector('.form').textContent = 'フォーム未登録';
+    el.querySelector('.diagram').innerHTML = '<div class="noDiagram">\u2014</div>';
+    el.querySelector('.tapmark').textContent = '候補なし';
+  }
+}
+
+/* ---------- ボトムシート ---------- */
+var sheetChord = null, scrollY = 0;
+var scrim = document.getElementById('scrim');
+var sheet = document.getElementById('sheet');
+var voiceBox = document.getElementById('voiceOptions');
+
+function paintOptions(chord){
+  var opts = voicings[chord], i, v, cur = sel(chord), html = '';
+  if(!opts || !opts.length){
+    voiceBox.innerHTML = '<div class="sheetNote">このコードにはフォーム候補が登録されていません。</div>';
+    return;
+  }
+  for(i=0;i<opts.length;i++){
+    v = opts[i];
+    html += '<button class="vopt' + (i === cur ? ' selected' : '') + '" type="button" data-idx="' + i + '">'
+          + '<span><span class="vname">' + v.name + '</span>'
+          + '<span class="vform">' + v.form + '</span>'
+          + '<span class="vnotes">構成音 ' + v.notes + '</span>'
+          + '<span class="vsrc">' + v.src + '／' + v.strings + '弦・押弦' + v.fingers + '本</span>'
+          + (i === cur ? '<span class="vsel">現在の選択</span>' : '')
+          + '</span><span>' + diagram(v.form) + '</span></button>';
+  }
+  voiceBox.innerHTML = html;
+  var btns = voiceBox.querySelectorAll('.vopt'), k;
+  for(k=0;k<btns.length;k++){
+    btns[k].addEventListener('click', onPick, false);
+  }
+}
+function onPick(ev){
+  var idx = parseInt(this.getAttribute('data-idx'), 10);
+  selected[sheetChord] = idx;
+  store.set(STORE_PREFIX + sheetChord, idx);
+  store.set(STAMP_KEY, new Date().toISOString());
+  mark('b4', true, '④ 候補を選ぶ → ダイアグラムが即時に変わった（' + sheetChord + ' = '
+       + voicings[sheetChord][idx].form + '）', 't4');
+  redraw();
+  paintOptions(sheetChord);
+}
+function openSheet(chord){
+  sheetChord = chord;
+  document.getElementById('sheetTitle').textContent = chord + ' のフォーム';
+  paintOptions(chord);
+  scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+  scrim.className = 'scrim open';
+  sheet.className = 'sheet open';
+  document.body.style.position = 'fixed';
+  document.body.style.top = (-scrollY) + 'px';
+  document.body.style.width = '100%';
+  var n = (voicings[chord] && voicings[chord].length) || 0;
+  mark('b3', n > 0, '③ ' + chord + ' をタップ → 候補 ' + n + '件を表示', 't3');
+}
+function closeSheet(){
+  scrim.className = 'scrim';
+  sheet.className = 'sheet';
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.width = '';
+  window.scrollTo(0, scrollY);
+}
+scrim.addEventListener('click', closeSheet, false);
+document.getElementById('closeSheet').addEventListener('click', closeSheet, false);
+
+function bindCard(el){
+  el.addEventListener('click', function(){
+    openSheet(el.getAttribute('data-chord'));
+  }, false);
+}
+bindCard(cards.current); bindCard(cards.next); bindCard(cards.after);
+
+/* ---------- 再生カーソル ---------- */
+var pos = 0, playing = false, startT = 0, rafId = 0, lastMi = -1;
+function locate(bp){
+  var acc = 0, i, e;
+  for(i=0;i<seq.length;i++){
+    e = acc + seq[i].beats;
+    if(bp < e || i === seq.length - 1){ return {i:i, local:Math.max(0, bp - acc)}; }
+    acc = e;
+  }
+  return {i:0, local:0};
+}
+function fmtTime(ms){
+  var s = Math.floor(ms/1000), m = Math.floor(s/60);
+  s = s % 60;
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+var loc = {i:0, local:0};
+function redraw(){
+  var x = seq[loc.i],
+      n = seq[Math.min(loc.i+1, seq.length-1)],
+      a = seq[Math.min(loc.i+2, seq.length-1)],
+      m = measures[x.mi], el;
+  renderCard(cards.current, x.chord);
+  renderCard(cards.next, n.chord);
+  renderCard(cards.after, a.chord);
+  document.getElementById('sectionTitle').textContent = m.section + (m.cue ? ' \u30fb ' + m.cue : '');
+  document.getElementById('lyric').innerHTML = m.lyric + '<small>' + m.meter + ' \u30fb M' + (x.mi+1) + '</small>';
+  document.getElementById('codebar').style.width = (Math.min(1, loc.local / x.beats) * 100) + '%';
+  if(lastMi !== x.mi){
+    var olds = document.querySelectorAll('.mini.activeMeasure'), k;
+    for(k=0;k<olds.length;k++){ olds[k].className = 'mini'; }
+    el = document.querySelector('.mini[data-mi="' + x.mi + '"]');
+    if(el){ el.className = 'mini activeMeasure'; }
+    lastMi = x.mi;
+  }
+}
+function tick(ms){
+  var t = Math.min(ms, duration);
+  loc = locate(t / BEATMS);
+  redraw();
+  document.getElementById('songbar').style.width = (t / duration * 100) + '%';
+  document.getElementById('time').textContent = fmtTime(t);
+  if(playing){
+    pos = (new Date().getTime()) - startT;
+    if(pos >= duration){
+      pos = duration; playing = false;
+      document.getElementById('play').textContent = '\u25b6 再生';
+    } else {
+      rafId = window.requestAnimationFrame ?
+        window.requestAnimationFrame(function(){ tick((new Date().getTime()) - startT); }) :
+        window.setTimeout(function(){ tick((new Date().getTime()) - startT); }, 50);
+    }
+  }
+}
+document.getElementById('play').addEventListener('click', function(){
+  if(!playing){
+    if(pos >= duration){ pos = 0; }
+    playing = true;
+    startT = (new Date().getTime()) - pos;
+    this.textContent = '\u2016 一時停止';
+    tick(pos);
+  } else {
+    playing = false;
+    pos = (new Date().getTime()) - startT;
+    if(window.cancelAnimationFrame){ window.cancelAnimationFrame(rafId); }
+    this.textContent = '\u25b6 再生';
+    tick(pos);
+  }
+}, false);
+document.getElementById('reset').addEventListener('click', function(){
+  playing = false;
+  if(window.cancelAnimationFrame){ window.cancelAnimationFrame(rafId); }
+  pos = 0; lastMi = -1;
+  document.getElementById('play').textContent = '\u25b6 再生';
+  tick(0);
+}, false);
+
+/* ---------- 受入テスト表示 ---------- */
+function mark(id, ok, text, textId){
+  var b = document.getElementById(id);
+  b.className = 'badge ' + (ok ? 'ok' : 'ng');
+  b.textContent = ok ? 'OK' : 'NG';
+  if(text && textId){ document.getElementById(textId).innerHTML = text; }
+}
+function wait(id){
+  var b = document.getElementById(id);
+  b.className = 'badge wait';
+  b.textContent = '未';
+}
+mark('b1', true);
+mark('b2', store.usable());
+if(!store.usable()){
+  document.getElementById('b2').textContent = 'NG';
+}
+wait('b3'); wait('b4');
+if(restored.length){
+  var at = store.get(STAMP_KEY);
+  mark('b5', true, '⑤ 再読み込み後も選択が残っている：<b>' + restored.join(' / ') + '</b>'
+       + (at ? '<br><span style="color:#888">保存時刻 ' + at + '</span>' : ''), 't5');
+} else {
+  wait('b5');
+  document.getElementById('t5').innerHTML =
+    '⑤ 再読み込み後も選択が残っている（まだ保存された選択はありません）';
+}
+document.getElementById('btnReload').addEventListener('click', function(){
+  window.location.reload();
+}, false);
+document.getElementById('btnClear').addEventListener('click', function(){
+  store.clearAll();
+  window.location.reload();
+}, false);
+document.getElementById('stamp').textContent = 'v12 PoC \u30fb 保存' + (store.usable() ? '有効' : '一時');
+
+tick(0);
+window.__poc = {
+  openSheet: openSheet, closeSheet: closeSheet, selected: selected,
+  voicings: voicings, diagram: diagram, store: store, restored: restored
+};
+})();
+</script>
+</body>
+</html>
