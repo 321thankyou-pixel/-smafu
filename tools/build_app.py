@@ -41,9 +41,17 @@ def diagram_html(form):
     vals = ['x' if p.lower() == 'x' else int(p) for p in parts]
     rows = list(reversed(vals))            # 1弦を上に
     fretted = [v for v in vals if isinstance(v, int) and v > 0]
-    start = min(fretted) if fretted else 1
-    if fretted and max(fretted) - start > 4:
-        start = max(1, max(fretted) - 4)
+    has_open = any(v == 0 for v in vals)
+    if not fretted:
+        start = 1
+    elif has_open and max(fretted) <= 5:
+        start = 1                       # 開放弦を含むローコードはナットから描く
+    else:
+        start = min(fretted)
+        if max(fretted) - start > 4:
+            start = max(1, max(fretted) - 4)
+    if fretted and (min(fretted) < start or max(fretted) > start + 4):
+        return '<div class="noDiagram">フォーム表記エラー</div>'
     out = []
     for i, v in enumerate(rows):
         mark = '&times;' if v == 'x' else ('&#9675;' if v == 0 else '')
@@ -149,8 +157,9 @@ main{padding:10px 10px 92px}
 .sRow{display:grid;grid-template-columns:17px 1fr;align-items:center;height:13px}
 .sLab{font-size:7px;color:#666}
 .sLine{position:relative;border-top:1px solid #333;height:100%}
-.fg{position:absolute;left:0;right:0;top:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr)}
-.fg i{border-left:1px solid #666}
+.fg{position:absolute;left:0;right:0;top:0;bottom:0;
+ display:-webkit-box;display:-webkit-flex;display:flex}
+.fg i{-webkit-box-flex:1;-webkit-flex:1 1 20%;flex:1 1 20%;border-left:1px solid #666}
 .nut .fg i:first-child{border-left:3px solid #111}
 .fg i:last-child{border-right:1px solid #666}
 .dot{position:absolute;width:9px;height:9px;top:-4px;background:#111;border-radius:50%;
@@ -184,7 +193,7 @@ main{padding:10px 10px 92px}
 .scrim.open{display:block}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;background:#fff;
  border-radius:18px 18px 0 0;max-height:80%;overflow-y:auto;-webkit-overflow-scrolling:touch;
- padding:13px 12px calc(18px + env(safe-area-inset-bottom));display:none;
+ padding:13px 12px 18px;padding-bottom:calc(18px + env(safe-area-inset-bottom));display:none;
  max-width:430px;margin:0 auto}
 .sheet.open{display:block}
 .sheetHead{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -202,7 +211,7 @@ main{padding:10px 10px 92px}
 .vsrc{display:block;font-size:9px;color:#999;margin-top:3px}
 .vsel{display:block;font-size:10px;color:var(--pink);font-weight:900;margin-top:5px}
 .bottom{position:fixed;left:0;right:0;bottom:0;z-index:25;background:#fff;border-top:1px solid #eee;
- padding:7px 12px calc(7px + env(safe-area-inset-bottom));max-width:430px;margin:0 auto}
+ padding:7px 12px;padding-bottom:calc(7px + env(safe-area-inset-bottom));max-width:430px;margin:0 auto}
 .songbar{height:4px;background:#eee;border-radius:999px;overflow:hidden}
 .songbar i{display:block;height:100%;width:0;background:var(--pink)}
 .brow{display:flex;justify-content:space-between;font-size:10px;color:#666;margin-top:5px}
@@ -299,6 +308,10 @@ var store = (function(){
       v = String(v); mem[k] = v;
       if(usable){ try{ localStorage.setItem(k,v); }catch(e){} }
     },
+    remove: function(k){
+      delete mem[k];
+      if(usable){ try{ localStorage.removeItem(k); }catch(e){} }
+    },
     keys: function(){
       var out = [], i, k;
       if(usable){
@@ -335,9 +348,12 @@ var restored = [];
     if(!voicings.hasOwnProperty(chord)) { continue; }
     raw = store.get(ks[i]);
     n = parseInt(raw, 10);
-    if(isNaN(n) || n < 0 || n >= voicings[chord].length){ continue; }
+    if(isNaN(n) || n < 0 || n >= voicings[chord].length){
+      store.remove(ks[i]);   /* 壊れた保存値は残さない */
+      continue;
+    }
     selected[chord] = n;
-    if(n !== 0){ restored.push(chord + ' → ' + voicings[chord][n].form); }
+    restored.push(chord + ' → ' + voicings[chord][n].form);
   }
 })();
 function sel(chord){ return selected.hasOwnProperty(chord) ? selected[chord] : 0; }
@@ -357,12 +373,26 @@ function parseForm(form){
   return out;
 }
 function diagram(form){
-  var vals = parseForm(form), i, v, rows, fretted = [], start, html = '', pct, mark, dot;
+  var vals = parseForm(form), i, v, rows, fretted = [], hasOpen = false,
+      start, html = '', pct, mark, dot, lo, hi;
   if(!vals){ return '<div class="noDiagram">フォーム表記エラー</div>'; }
-  for(i=0;i<6;i++){ if(vals[i] !== 'x' && vals[i] > 0){ fretted.push(vals[i]); } }
-  start = fretted.length ? Math.min.apply(null, fretted) : 1;
-  if(fretted.length && (Math.max.apply(null, fretted) - start) > 4){
-    start = Math.max(1, Math.max.apply(null, fretted) - 4);
+  for(i=0;i<6;i++){
+    if(vals[i] === 'x'){ continue; }
+    if(vals[i] === 0){ hasOpen = true; } else { fretted.push(vals[i]); }
+  }
+  if(!fretted.length){
+    start = 1;
+  } else {
+    lo = Math.min.apply(null, fretted); hi = Math.max.apply(null, fretted);
+    if(hasOpen && hi <= 5){
+      start = 1;                    /* 開放弦を含むローコードはナットから描く */
+    } else {
+      start = lo;
+      if(hi - start > 4){ start = Math.max(1, hi - 4); }
+    }
+    if(lo < start || hi > start + 4){
+      return '<div class="noDiagram">フォーム表記エラー</div>';
+    }
   }
   rows = vals.slice(0).reverse();   /* 1弦を上に */
   for(i=0;i<6;i++){
@@ -451,7 +481,7 @@ function onPick(ev){
   store.set(STAMP_KEY, new Date().toISOString());
   mark('b4', true, '④ 候補を選ぶ → ダイアグラムが即時に変わった（' + sheetChord + ' = '
        + voicings[sheetChord][idx].form + '）', 't4');
-  redraw();
+  redraw(true);
   paintOptions(sheetChord);
 }
 function openSheet(chord){
@@ -465,7 +495,14 @@ function openSheet(chord){
   document.body.style.top = (-scrollY) + 'px';
   document.body.style.width = '100%';
   var n = (voicings[chord] && voicings[chord].length) || 0;
-  mark('b3', n > 0, '③ ' + chord + ' をタップ → 候補 ' + n + '件を表示', 't3');
+  if(n > 0){
+    mark('b3', true, '③ ' + chord + ' をタップ → 候補 ' + n + '件を表示', 't3');
+  } else {
+    /* N.C. などフォームを持たないコード。仕様どおりなので NG にはしない */
+    document.getElementById('t3').innerHTML =
+      '③ コードカードをタップ → 候補が出る（' + chord
+      + ' はフォームを持たないコードです。別のカードで試してください）';
+  }
 }
 function closeSheet(){
   scrim.className = 'scrim';
@@ -501,30 +538,34 @@ function fmtTime(ms){
   s = s % 60;
   return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
 }
-var loc = {i:0, local:0};
-function redraw(){
+var loc = {i:0, local:0}, lastSeqI = -1;
+function redraw(force){
   var x = seq[loc.i],
       n = seq[Math.min(loc.i+1, seq.length-1)],
       a = seq[Math.min(loc.i+2, seq.length-1)],
-      m = measures[x.mi], el;
-  renderCard(cards.current, x.chord);
-  renderCard(cards.next, n.chord);
-  renderCard(cards.after, a.chord);
-  document.getElementById('sectionTitle').textContent = m.section + (m.cue ? ' \\u30fb ' + m.cue : '');
-  document.getElementById('lyric').innerHTML = m.lyric + '<small>' + m.meter + ' \\u30fb M' + (x.mi+1) + '</small>';
-  document.getElementById('codebar').style.width = (Math.min(1, loc.local / x.beats) * 100) + '%';
-  if(lastMi !== x.mi){
-    var olds = document.querySelectorAll('.mini.activeMeasure'), k;
-    for(k=0;k<olds.length;k++){ olds[k].className = 'mini'; }
-    el = document.querySelector('.mini[data-mi="' + x.mi + '"]');
-    if(el){ el.className = 'mini activeMeasure'; }
-    lastMi = x.mi;
+      m = measures[x.mi], el, olds, k;
+  /* カードの再描画はコードが変わったときだけ（毎フレームやると実機で重い） */
+  if(force || lastSeqI !== loc.i){
+    lastSeqI = loc.i;
+    renderCard(cards.current, x.chord);
+    renderCard(cards.next, n.chord);
+    renderCard(cards.after, a.chord);
+    document.getElementById('sectionTitle').textContent = m.section + (m.cue ? ' \\u30fb ' + m.cue : '');
+    document.getElementById('lyric').innerHTML = m.lyric + '<small>' + m.meter + ' \\u30fb M' + (x.mi+1) + '</small>';
+    if(lastMi !== x.mi){
+      olds = document.querySelectorAll('.mini.activeMeasure');
+      for(k=0;k<olds.length;k++){ olds[k].className = 'mini'; }
+      el = document.querySelector('.mini[data-mi="' + x.mi + '"]');
+      if(el){ el.className = 'mini activeMeasure'; }
+      lastMi = x.mi;
+    }
   }
+  document.getElementById('codebar').style.width = (Math.min(1, loc.local / x.beats) * 100) + '%';
 }
 function tick(ms){
   var t = Math.min(ms, duration);
   loc = locate(t / BEATMS);
-  redraw();
+  redraw(false);
   document.getElementById('songbar').style.width = (t / duration * 100) + '%';
   document.getElementById('time').textContent = fmtTime(t);
   if(playing){
@@ -557,7 +598,7 @@ document.getElementById('play').addEventListener('click', function(){
 document.getElementById('reset').addEventListener('click', function(){
   playing = false;
   if(window.cancelAnimationFrame){ window.cancelAnimationFrame(rafId); }
-  pos = 0; lastMi = -1;
+  pos = 0; lastMi = -1; lastSeqI = -1;
   document.getElementById('play').textContent = '\\u25b6 再生';
   tick(0);
 }, false);

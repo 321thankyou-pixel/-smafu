@@ -124,6 +124,32 @@ try:
       return miss;""")
     rec('譜面上の全コードにフォーム候補がある', len(miss) == 0, str(miss))
 
+    # --- レビュー指摘の再発防止テスト ---
+    nut = d.execute_script(
+        "var h = window.__poc.diagram('x32000');"
+        "return [h.indexOf('dg nut') >= 0, h.indexOf('>1F') >= 0];")
+    rec('開放弦のローコードにナットが出る (CM7 x32000)', nut[0] and nut[1], str(nut))
+
+    rec('窓外フォームはエラー表示になる', d.execute_script(
+        "return window.__poc.diagram('x-1-2-3-9-10').indexOf('フォーム表記エラー') >= 0;"))
+
+    d.execute_script("window.__poc.openSheet('N.C.');")
+    time.sleep(0.3)
+    rec('N.C. タップで③が NG にならない',
+        d.find_element(By.ID, 'b3').text != 'NG', 'b3=' + d.find_element(By.ID, 'b3').text)
+    d.execute_script("window.__poc.closeSheet();")
+    time.sleep(0.3)
+
+    d.find_element(By.CSS_SELECTOR, '.card.next').click()
+    time.sleep(0.4)
+    d.find_elements(By.CSS_SELECTOR, '#voiceOptions .vopt')[0].click()
+    time.sleep(0.4)
+    d.find_element(By.ID, 'closeSheet').click()
+    d.refresh()
+    time.sleep(1.2)
+    rec('index 0 を選び直しても⑤が OK',
+        d.find_element(By.ID, 'b5').text == 'OK', d.find_element(By.ID, 't5').text[:60])
+
     d.get_screenshot_as_file('/home/user/work/webkit_shot.png')
 finally:
     d.quit()

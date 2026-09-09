@@ -82,6 +82,43 @@ function rec(name, ok, detail) {
   });
   rec('全フォームがダイアグラム化可能', bad.length === 0, JSON.stringify(bad));
 
+  // --- レビュー指摘の再発防止テスト ---
+
+  // 指摘2: 開放弦を含むローコードはナットから描き、1F〜と表示する
+  const nutInfo = await page.evaluate(() => {
+    const h = window.__poc.diagram('x32000');
+    return { nut: h.indexOf('dg nut') >= 0, from1: h.indexOf('>1F') >= 0 };
+  });
+  rec('開放弦のローコードにナットが出る (CM7 x32000)', nutInfo.nut && nutInfo.from1, JSON.stringify(nutInfo));
+
+  // 指摘3: 5フレット窓に収まらないフォームはドットを窓外に描かずエラーにする
+  const outOfWindow = await page.evaluate(() =>
+    window.__poc.diagram('x-1-2-3-9-10').indexOf('フォーム表記エラー') >= 0);
+  rec('窓外フォームはエラー表示になる', outOfWindow);
+
+  // 指摘4: フォームを持たない N.C. をタップしても受入バッジ③を NG にしない
+  await page.evaluate(() => window.__poc.openSheet('N.C.'));
+  await page.waitForTimeout(200);
+  const b3AfterNC = await page.textContent('#b3');
+  rec('N.C. タップで③が NG にならない', b3AfterNC !== 'NG', 'b3=' + b3AfterNC);
+  await page.evaluate(() => window.__poc.closeSheet());
+  await page.waitForTimeout(200);
+
+  // 指摘5: 第1候補(index 0)を選び直しても、再読み込み後に⑤が OK になる
+  await page.tap('.card.next');
+  await page.waitForTimeout(300);
+  await (await page.$$('#voiceOptions .vopt'))[0].tap();
+  await page.waitForTimeout(300);
+  await page.tap('#closeSheet');
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(500);
+  rec('index 0 を選び直しても⑤が OK', (await page.textContent('#b5')) === 'OK',
+      (await page.textContent('#t5')).slice(0, 60));
+  const zeroForm = (await page.textContent('.card.next .form')).trim();
+  const zeroExpect = await page.evaluate(c => window.__poc.voicings[c][0].form,
+    await page.getAttribute('.card.next', 'data-chord'));
+  rec('index 0 の内容も正しく復元', zeroForm === zeroExpect, zeroForm);
+
   await page.screenshot({ path: '/home/user/work/chromium_shot.png', fullPage: false });
   // シートを開いた状態のスクショも
   await page.tap('.card.next');

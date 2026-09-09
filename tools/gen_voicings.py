@@ -75,10 +75,10 @@ def fingers_needed(form):
     if plain <= 4:
         return plain
     # セーハを検討: 最低フレットで全弦を押さえる
-    # セーハ下に開放弦があると不可
+    # セーハ指はその範囲の全弦に触れるため、範囲内に開放弦もミュート弦も作れない
     lo_idx = min(i for i, v in enumerate(form) if v != 'x')
     for i in range(lo_idx, 6):
-        if form[i] == 0:
+        if form[i] == 'x' or form[i] == 0:
             return None
     barre = 1 + sum(1 for _, v in fr if v > lo)
     return barre if barre <= 4 else None
