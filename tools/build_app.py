@@ -78,8 +78,12 @@ for mi, mm in enumerate(measures):
         '<div class="mc" style="width:%.4f%%">%s<small>%d拍</small></div>' % (c[1] * 100.0 / total, c[0], c[1])
         for c in mm['chords'])
     cue = ('<span class="cue">%s</span>' % mm['cue']) if mm['cue'] else ''
-    score.append('<div class="mini" data-mi="%d"><div class="mtop"><span class="mno">M%d</span>%s</div>'
-                 '<div class="mchords">%s</div></div>' % (mi, mi + 1, cue, cells))
+    # 歌詞は端末内にのみ保存するため、生成物には一切埋め込まない
+    score.append('<button class="mini" type="button" data-mi="%d">'
+                 '<span class="mtop"><span class="mno">M%d</span>%s</span>'
+                 '<span class="mchords">%s</span>'
+                 '<span class="mlyric" data-mlyric="%d"></span></button>'
+                 % (mi, mi + 1, cue, cells, mi))
 score_html = ''.join(score)
 
 # 初期表示（静的）
@@ -186,7 +190,9 @@ main{padding:10px 10px 92px}
 .lookhead{font-size:12px;font-weight:900;margin-bottom:8px}
 .sec{font-size:10px;font-weight:900;color:#666;margin:12px 2px 5px;display:flex;align-items:center;gap:7px}
 .sec:before,.sec:after{content:"";height:1px;background:#ddd;flex:1}
-.mini{border:1px solid #e0e0e0;border-radius:10px;padding:6px 7px;margin-bottom:6px;background:#fafafa}
+.mini{display:block;width:100%;text-align:left;font:inherit;color:inherit;
+ border:1px solid #e0e0e0;border-radius:10px;padding:6px 7px;margin:0 0 6px;background:#fafafa}
+.mini:active{background:#f0f0f0}
 .mini.activeMeasure{border:2px solid #111;background:#fff}
 .mtop{display:flex;justify-content:space-between;align-items:center;gap:6px}
 .mno{font-size:9px;font-weight:900;color:#888}
@@ -219,6 +225,25 @@ main{padding:10px 10px 92px}
 .vnotes{display:block;font-size:10px;color:#888;margin-top:3px}
 .vsrc{display:block;font-size:9px;color:#999;margin-top:3px}
 .vsel{display:block;font-size:10px;color:var(--pink);font-weight:900;margin-top:5px}
+/* 歌詞（端末内保存） */
+.lyricPanel{border:1px solid #ddd;border-radius:14px;padding:11px;margin-top:16px;background:#fcfcfc}
+.lyricPanel h2{font-size:12px;margin:0 0 6px}
+.lyricPanel p{font-size:10px;color:#777;line-height:1.65;margin:0 0 8px}
+.lyricPanel textarea{display:block;width:100%;min-height:104px;padding:8px;border:1px solid #ccc;
+ border-radius:10px;background:#fff;color:#111;resize:vertical;-webkit-appearance:none;appearance:none;
+ font:12px/1.65 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif}
+.lyricRow{display:flex;gap:7px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.lyricRow label{font-size:10px;color:#666}
+.lyricRow input{width:62px;padding:6px 7px;border:1px solid #ccc;border-radius:8px;background:#fff;color:#111;
+ font:12px -apple-system,BlinkMacSystemFont,sans-serif;-webkit-appearance:none;appearance:none}
+.lyricStat{font-size:10px;font-weight:900;margin-top:8px;color:#444}
+.lyricStat b{color:var(--pink)}
+.ctrl.sm{padding:7px 10px;font-size:12px}
+.mlyric{font-size:10px;color:#555;line-height:1.5;margin-top:4px;font-weight:400;
+ white-space:pre-wrap;word-break:break-word}
+.lyricEditBox{display:block;width:100%;min-height:76px;padding:8px;border:1px solid #ccc;border-radius:10px;
+ background:#fff;color:#111;-webkit-appearance:none;appearance:none;
+ font:14px/1.6 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif}
 .bottom{position:fixed;left:0;right:0;bottom:0;z-index:25;background:#fff;border-top:1px solid #eee;
  padding:7px 12px;padding-bottom:calc(7px + env(safe-area-inset-bottom));max-width:430px;margin:0 auto}
 .songbar{height:4px;background:#eee;border-radius:999px;overflow:hidden}
@@ -260,6 +285,25 @@ main{padding:10px 10px 92px}
  <button class="ctrl alt" id="reset" type="button">↺ 戻す</button>
 </div>
 
+<div class="lyricPanel">
+ <h2>歌詞（この端末にだけ保存されます）</h2>
+ <p>入力した歌詞は<b>あなたの端末の中だけ</b>に保存されます。どこにも送信されず、公開もされません。<br>
+  書式は2通り。どちらでも読み取ります。<br>
+  ・<b>小節番号つき</b>：<code>M9 歌詞</code> / <code>9: 歌詞</code> のように行頭に小節番号<br>
+  ・<b>番号なし</b>：1行＝1小節。下の「開始小節」から順に割り当てます（空行はその小節を空にします）</p>
+ <textarea id="lyricInput" placeholder="M9 …&#10;M10 …&#10;&#10;または1行＝1小節で貼り付け"></textarea>
+ <div class="lyricRow">
+  <label for="lyricStart">開始小節</label><input id="lyricStart" type="number" min="1" max="126" value="9">
+  <button class="ctrl sm" id="lyricApply" type="button">取り込む</button>
+  <button class="ctrl alt sm" id="lyricExport" type="button">書き出す</button>
+  <button class="ctrl alt sm" id="lyricClear" type="button">歌詞を全部消す</button>
+ </div>
+ <div class="lyricStat" id="lyricStat">未登録</div>
+ <p style="margin:8px 0 0">小節をタップすると、その小節の歌詞だけを直接なおせます。
+  Safariは長期間使わないページの保存データを消すことがあるため、
+  入力後は「書き出す」でテキストを控えておくことをおすすめします。</p>
+</div>
+
 <div class="look">
  <div class="lookhead">全曲譜面（先読み）</div>
  __SCORE__
@@ -276,7 +320,7 @@ main{padding:10px 10px 92px}
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
  <div class="sheetHead"><div class="sheetTitle" id="sheetTitle">コードフォーム</div>
   <button class="closeBtn" id="closeSheet" type="button" aria-label="閉じる">&times;</button></div>
- <div class="sheetNote">表示するフォームを選びます。選択は同じコード名の全出現箇所に適用され、この端末に保存されます。<br>
+ <div class="sheetNote" id="sheetNote">表示するフォームを選びます。選択は同じコード名の全出現箇所に適用され、この端末に保存されます。<br>
   掲載フォームは構成音を機械検証済み（押弦4本以内・4フレット幅以内）。</div>
  <div id="voiceOptions"></div>
 </div>
@@ -366,6 +410,85 @@ var restored = [];
   }
 })();
 function sel(chord){ return selected.hasOwnProperty(chord) ? selected[chord] : 0; }
+
+/* ---------- 歌詞（端末内にのみ保存。ネットワークへは一切送らない） ---------- */
+var LYRIC_KEY = 'aliens.lyrics.v1';
+var lyrics = {};
+(function(){
+  var raw = store.get(LYRIC_KEY), obj = null, k;
+  if(!raw){ return; }
+  try { obj = JSON.parse(raw); } catch(e) { obj = null; }
+  if(!obj || typeof obj !== 'object'){ return; }
+  for(k in obj){
+    if(obj.hasOwnProperty(k) && typeof obj[k] === 'string' && obj[k] !== ''){
+      lyrics[k] = obj[k];
+    }
+  }
+})();
+function lyricOf(mi){
+  var k = String(mi);
+  return lyrics.hasOwnProperty(k) ? lyrics[k] : '';
+}
+function lyricCount(){
+  var n = 0, k;
+  for(k in lyrics){ if(lyrics.hasOwnProperty(k) && lyrics[k]){ n++; } }
+  return n;
+}
+function saveLyrics(){
+  store.set(LYRIC_KEY, JSON.stringify(lyrics));
+  store.set(STAMP_KEY, new Date().toISOString());
+}
+function esc(t){
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function matchNumbered(line){
+  var m = line.match(/^[Mm]\s*(\d{1,3})\s*[:\\uff1a]?\s*(.*)$/);
+  if(!m){ m = line.match(/^(\d{1,3})\s*[:\\uff1a]\s*(.*)$/); }
+  if(!m){ m = line.match(/^(\d{1,3})[ \\t\\u3000]+(.*)$/); }
+  if(!m){ return null; }
+  return { no: parseInt(m[1], 10), text: m[2] };
+}
+function parseLyricText(text, startNo){
+  var raw = String(text).split('\\n'), lines = [], i, ln, hit = 0, nonEmpty = 0,
+      out = {}, mi, mm;
+  for(i = 0; i < raw.length; i++){
+    ln = raw[i];
+    if(ln.charAt(ln.length - 1) === '\\r'){ ln = ln.slice(0, -1); }
+    lines.push(ln);
+    if(ln.replace(/^\s+|\s+$/g, '') !== ''){
+      nonEmpty++;
+      if(matchNumbered(ln)){ hit++; }
+    }
+  }
+  if(nonEmpty === 0){ return { mode: 'empty', map: {}, count: 0 }; }
+  if(hit >= Math.ceil(nonEmpty * 0.6)){
+    for(i = 0; i < lines.length; i++){
+      mm = matchNumbered(lines[i]);
+      if(!mm){ continue; }
+      mi = mm.no - 1;
+      if(mi < 0 || mi >= measures.length){ continue; }
+      if(mm.text !== ''){ out[String(mi)] = mm.text; }
+    }
+    return { mode: 'numbered', map: out, count: countKeys(out) };
+  }
+  mi = startNo - 1;
+  for(i = 0; i < lines.length; i++){
+    if(mi >= measures.length){ break; }
+    ln = lines[i].replace(/^\s+|\s+$/g, '');
+    if(ln !== ''){ out[String(mi)] = ln; }
+    mi++;
+  }
+  return { mode: 'sequential', map: out, count: countKeys(out) };
+}
+function countKeys(o){ var n = 0, k; for(k in o){ if(o.hasOwnProperty(k)){ n++; } } return n; }
+function exportLyricText(){
+  var i, k, out = [];
+  for(i = 0; i < measures.length; i++){
+    k = String(i);
+    if(lyrics.hasOwnProperty(k) && lyrics[k]){ out.push('M' + (i + 1) + ' ' + lyrics[k]); }
+  }
+  return out.join('\\n');
+}
 
 /* ---------- ダイアグラム ---------- */
 function parseForm(form){
@@ -464,8 +587,21 @@ function renderCard(el, chord){
   }
 }
 
+function paintScoreLyrics(){
+  var els = document.querySelectorAll('[data-mlyric]'), i, mi, t;
+  for(i = 0; i < els.length; i++){
+    mi = parseInt(els[i].getAttribute('data-mlyric'), 10);
+    t = lyricOf(mi);
+    els[i].innerHTML = t ? esc(t) : '';
+  }
+}
+function paintLyricStat(){
+  var n = lyricCount(), el = document.getElementById('lyricStat');
+  el.innerHTML = n ? ('登録済み <b>' + n + '</b> 小節（この端末のみ）') : '未登録';
+}
+
 /* ---------- ボトムシート ---------- */
-var sheetChord = null, scrollY = 0;
+var sheetChord = null, sheetMi = -1, sheetMode = 'voicing', scrollY = 0;
 var scrim = document.getElementById('scrim');
 var sheet = document.getElementById('sheet');
 var voiceBox = document.getElementById('voiceOptions');
@@ -502,16 +638,44 @@ function onPick(ev){
   redraw(true);
   paintOptions(sheetChord);
 }
-function openSheet(chord){
-  sheetChord = chord;
-  document.getElementById('sheetTitle').textContent = chord + ' のフォーム';
-  paintOptions(chord);
+function showSheet(){
   scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
   scrim.className = 'scrim open';
   sheet.className = 'sheet open';
   document.body.style.position = 'fixed';
   document.body.style.top = (-scrollY) + 'px';
   document.body.style.width = '100%';
+}
+function openLyricSheet(mi){
+  sheetMode = 'lyric'; sheetMi = mi; sheetChord = null;
+  var m = measures[mi], names = [], i;
+  for(i = 0; i < m.chords.length; i++){ names.push(m.chords[i][0]); }
+  document.getElementById('sheetTitle').textContent = 'M' + (mi + 1) + ' の歌詞';
+  document.getElementById('sheetNote').innerHTML =
+    m.section + (m.cue ? ' \\u30fb ' + m.cue : '') + ' \\u30fb ' + names.join(' / ')
+    + '<br>この端末にだけ保存されます。空にすれば削除されます。';
+  document.getElementById('voiceOptions').innerHTML =
+    '<textarea class="lyricEditBox" id="lyricEdit"></textarea>'
+    + '<div class="lyricRow"><button class="ctrl sm" id="lyricSaveOne" type="button">保存</button>'
+    + '<button class="ctrl alt sm" id="lyricCancel" type="button">やめる</button></div>';
+  document.getElementById('lyricEdit').value = lyricOf(mi);
+  document.getElementById('lyricSaveOne').addEventListener('click', function(){
+    var v = document.getElementById('lyricEdit').value.replace(/^\s+|\s+$/g, '');
+    if(v === ''){ delete lyrics[String(mi)]; } else { lyrics[String(mi)] = v; }
+    saveLyrics(); paintScoreLyrics(); paintLyricStat(); redraw(true); closeSheet();
+  }, false);
+  document.getElementById('lyricCancel').addEventListener('click', closeSheet, false);
+  showSheet();
+}
+function openSheet(chord){
+  sheetMode = 'voicing'; sheetMi = -1;
+  sheetChord = chord;
+  document.getElementById('sheetTitle').textContent = chord + ' のフォーム';
+  document.getElementById('sheetNote').innerHTML =
+    '表示するフォームを選びます。選択は同じコード名の全出現箇所に適用され、この端末に保存されます。<br>'
+    + '掲載フォームは構成音を機械検証済み（押弦4本以内・4フレット幅以内）。';
+  paintOptions(chord);
+  showSheet();
   var n = (voicings[chord] && voicings[chord].length) || 0;
   if(n > 0){
     mark('b3', true, '③ ' + chord + ' をタップ → 候補 ' + n + '件を表示', 't3');
@@ -539,6 +703,16 @@ function bindCard(el){
   }, false);
 }
 bindCard(cards.current); bindCard(cards.next); bindCard(cards.after);
+
+(function(){
+  var minis = document.querySelectorAll('.mini[data-mi]'), i;
+  function bindMini(el){
+    el.addEventListener('click', function(){
+      openLyricSheet(parseInt(el.getAttribute('data-mi'), 10));
+    }, false);
+  }
+  for(i = 0; i < minis.length; i++){ bindMini(minis[i]); }
+})();
 
 /* ---------- 再生カーソル ---------- */
 var pos = 0, playing = false, startT = 0, rafId = 0, lastMi = -1;
@@ -569,7 +743,10 @@ function redraw(force){
     renderCard(cards.next, n.chord);
     renderCard(cards.after, a.chord);
     document.getElementById('sectionTitle').textContent = m.section + (m.cue ? ' \\u30fb ' + m.cue : '');
-    document.getElementById('lyric').innerHTML = m.lyric + '<small>' + m.meter + ' \\u30fb M' + (x.mi+1) + '</small>';
+    var lt = lyricOf(x.mi);
+    document.getElementById('lyric').innerHTML =
+      (lt ? esc(lt) : '<span style="color:#bbb">' + esc(m.lyric) + '</span>')
+      + '<small>' + m.meter + ' \\u30fb M' + (x.mi+1) + '</small>';
     if(lastMi !== x.mi){
       olds = document.querySelectorAll('.mini.activeMeasure');
       for(k=0;k<olds.length;k++){ olds[k].className = 'mini'; }
@@ -653,10 +830,49 @@ if(restored.length){
     '③④は読み込みのたびに「未」へ戻ります（今回のタップ待ちという意味で、失敗ではありません）。'
     + '<b>⑤が緑なら、前回選んだフォームが再読み込み後も保持されています。</b>';
 }
+document.getElementById('lyricApply').addEventListener('click', function(){
+  var ta = document.getElementById('lyricInput'),
+      startEl = document.getElementById('lyricStart'),
+      start = parseInt(startEl.value, 10),
+      res, k;
+  if(isNaN(start) || start < 1){ start = 1; }
+  if(start > measures.length){ start = measures.length; }
+  res = parseLyricText(ta.value, start);
+  if(res.mode === 'empty'){
+    document.getElementById('lyricStat').innerHTML = '取り込む歌詞がありません';
+    return;
+  }
+  for(k in res.map){ if(res.map.hasOwnProperty(k)){ lyrics[k] = res.map[k]; } }
+  saveLyrics(); paintScoreLyrics(); redraw(true); paintLyricStat();
+  document.getElementById('lyricStat').innerHTML +=
+    '　/　今回 <b>' + res.count + '</b> 小節を取り込みました（'
+    + (res.mode === 'numbered' ? '小節番号つきとして読み取り' : 'M' + start + ' から順に割り当て') + '）';
+  ta.value = '';
+}, false);
+document.getElementById('lyricExport').addEventListener('click', function(){
+  var t = exportLyricText(), ta = document.getElementById('lyricInput');
+  if(t === ''){
+    document.getElementById('lyricStat').innerHTML = '書き出す歌詞がありません';
+    return;
+  }
+  ta.value = t;
+  try { ta.focus(); ta.setSelectionRange(0, t.length); } catch(e) {}
+  document.getElementById('lyricStat').innerHTML =
+    '上の欄に書き出しました。長押しして<b>すべてを選択→コピー</b>で控えを取れます';
+}, false);
+document.getElementById('lyricClear').addEventListener('click', function(){
+  var k;
+  for(k in lyrics){ if(lyrics.hasOwnProperty(k)){ delete lyrics[k]; } }
+  store.remove(LYRIC_KEY);
+  paintScoreLyrics(); redraw(true); paintLyricStat();
+}, false);
+paintScoreLyrics(); paintLyricStat();
+
 document.getElementById('btnReload').addEventListener('click', function(){
   window.location.reload();
 }, false);
 document.getElementById('btnClear').addEventListener('click', function(){
+  /* 受入テスト用。フォーム選択だけを消し、入力した歌詞は消さない */
   store.clearAll();
   window.location.reload();
 }, false);
@@ -665,7 +881,10 @@ document.getElementById('stamp').textContent = 'v12 PoC \\u30fb 保存' + (store
 tick(0);
 window.__poc = {
   openSheet: openSheet, closeSheet: closeSheet, selected: selected,
-  voicings: voicings, diagram: diagram, store: store, restored: restored
+  voicings: voicings, diagram: diagram, store: store, restored: restored,
+  openLyricSheet: openLyricSheet, lyrics: lyrics, lyricOf: lyricOf,
+  parseLyricText: parseLyricText, exportLyricText: exportLyricText,
+  measures: measures
 };
 })();
 </script>

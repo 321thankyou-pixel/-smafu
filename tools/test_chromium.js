@@ -137,6 +137,86 @@ function rec(name, ok, detail) {
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(400);
 
+  // --- 歌詞（端末内保存）のテスト。曲の実歌詞は使わずダミー文字列で検証する ---
+
+  // 生成物に歌詞が埋め込まれていないこと（リポジトリに歌詞を残さない設計）
+  const embedded = await page.evaluate(() => {
+    var els = document.querySelectorAll('[data-mlyric]'), bad = [];
+    for (var i = 0; i < els.length; i++) {
+      if (els[i].textContent.trim() !== '') bad.push(i);
+    }
+    return { slots: els.length, filled: bad.length };
+  });
+  rec('初期状態の生成物に歌詞が埋め込まれていない',
+      embedded.slots === 126 && embedded.filled === 0, JSON.stringify(embedded));
+
+  // 小節番号つき書式の取り込み
+  await page.fill('#lyricInput', 'M9 ダミー歌詞A\nM10 ダミー歌詞B\n11: ダミー歌詞C');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  const numbered = await page.evaluate(() => [
+    window.__poc.lyricOf(8), window.__poc.lyricOf(9), window.__poc.lyricOf(10)]);
+  rec('小節番号つき書式を取り込める',
+      numbered.join('|') === 'ダミー歌詞A|ダミー歌詞B|ダミー歌詞C', numbered.join('|'));
+  rec('譜面の該当小節に歌詞が出る',
+      (await page.textContent('[data-mlyric="8"]')).trim() === 'ダミー歌詞A');
+
+  // 番号なし書式（開始小節から順に割り当て）
+  await page.fill('#lyricInput', 'ダミー行1\n\nダミー行3');
+  await page.fill('#lyricStart', '20');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  const seq = await page.evaluate(() => [
+    window.__poc.lyricOf(19), window.__poc.lyricOf(20), window.__poc.lyricOf(21)]);
+  rec('番号なし書式を開始小節から順に割り当てる',
+      seq[0] === 'ダミー行1' && seq[1] === '' && seq[2] === 'ダミー行3', JSON.stringify(seq));
+
+  // 再読み込みしても歌詞が残る
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(500);
+  rec('再読み込み後も歌詞が残る',
+      (await page.evaluate(() => window.__poc.lyricOf(8))) === 'ダミー歌詞A');
+  rec('歌詞の登録件数が表示される',
+      (await page.textContent('#lyricStat')).indexOf('登録済み') >= 0,
+      (await page.textContent('#lyricStat')).trim());
+
+  // 小節をタップして1小節だけ直す
+  await page.tap('.mini[data-mi="8"]');
+  await page.waitForTimeout(300);
+  rec('小節タップで歌詞編集シートが開く',
+      (await page.textContent('#sheetTitle')).indexOf('M9') >= 0,
+      await page.textContent('#sheetTitle'));
+  rec('編集欄に既存の歌詞が入っている',
+      (await page.inputValue('#lyricEdit')) === 'ダミー歌詞A');
+  await page.fill('#lyricEdit', 'ダミー修正後');
+  await page.tap('#lyricSaveOne');
+  await page.waitForTimeout(300);
+  rec('1小節だけ直せる',
+      (await page.evaluate(() => window.__poc.lyricOf(8))) === 'ダミー修正後');
+
+  // 書き出し
+  await page.tap('#lyricExport');
+  await page.waitForTimeout(200);
+  const exported = await page.inputValue('#lyricInput');
+  rec('書き出すと小節番号つきテキストになる',
+      exported.indexOf('M9 ダミー修正後') === 0 && exported.indexOf('M20 ダミー行1') > 0,
+      exported.split('\n')[0]);
+
+  // 歌詞を消してもフォーム選択は残る
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(300);
+  rec('歌詞だけ消せる（フォーム選択は残る）',
+      (await page.evaluate(() => window.__poc.lyricOf(8))) === '' &&
+      (await page.textContent('#b5')) === 'OK');
+
+  // 歌詞は外部に送信されない（fetch/XHR/beacon を一切使っていない）
+  const src = await page.evaluate(() => document.documentElement.outerHTML);
+  const net = ['fetch(', 'XMLHttpRequest', 'sendBeacon', 'WebSocket', 'navigator.send']
+    .filter(k => src.indexOf(k) >= 0);
+  rec('ページに外部送信のコードが無い', net.length === 0, JSON.stringify(net));
+
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(400);
   await page.screenshot({ path: '/home/user/work/chromium_shot.png', fullPage: false });
   // シートを開いた状態のスクショも
   await page.tap('.card.next');

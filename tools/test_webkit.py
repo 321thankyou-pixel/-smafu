@@ -150,6 +150,58 @@ try:
     rec('index 0 を選び直しても⑤が OK',
         d.find_element(By.ID, 'b5').text == 'OK', d.find_element(By.ID, 't5').text[:60])
 
+    # --- 歌詞（端末内保存）。曲の実歌詞は使わずダミー文字列で検証する ---
+    filled = d.execute_script(
+        "var e=document.querySelectorAll('[data-mlyric]'),n=0,i;"
+        "for(i=0;i<e.length;i++){ if(e[i].textContent.replace(/\\s/g,'')!==''){n++;} }"
+        "return [e.length, n];")
+    rec('初期状態の生成物に歌詞が埋め込まれていない',
+        filled[0] == 126 and filled[1] == 0, str(filled))
+
+    def tap(el_id):
+        el = d.find_element(By.ID, el_id)
+        d.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+        time.sleep(0.2)
+        el.click()
+
+    ta = d.find_element(By.ID, 'lyricInput')
+    d.execute_script("arguments[0].scrollIntoView({block:'center'});", ta)
+    ta.clear()
+    ta.send_keys('M9 ダミー歌詞A')
+    tap('lyricApply')
+    time.sleep(0.4)
+    rec('小節番号つき書式を取り込める',
+        d.execute_script("return window.__poc.lyricOf(8);") == 'ダミー歌詞A')
+
+    d.refresh()
+    time.sleep(1.2)
+    rec('再読み込み後も歌詞が残る',
+        d.execute_script("return window.__poc.lyricOf(8);") == 'ダミー歌詞A')
+    rec('譜面の該当小節に歌詞が出る',
+        d.find_element(By.CSS_SELECTOR, '[data-mlyric="8"]').text.strip() == 'ダミー歌詞A')
+
+    mini = d.find_element(By.CSS_SELECTOR, '.mini[data-mi="8"]')
+    d.execute_script("arguments[0].scrollIntoView({block:'center'});", mini)
+    time.sleep(0.2)
+    mini.click()
+    time.sleep(0.5)
+    rec('小節タップで歌詞編集シートが開く',
+        'M9' in d.find_element(By.ID, 'sheetTitle').text,
+        d.find_element(By.ID, 'sheetTitle').text)
+    rec('編集欄に既存の歌詞が入っている',
+        d.find_element(By.ID, 'lyricEdit').get_attribute('value') == 'ダミー歌詞A')
+    d.execute_script("document.getElementById('lyricEdit').value='ダミー修正後';")
+    tap('lyricSaveOne')
+    time.sleep(0.4)
+    rec('1小節だけ直せる',
+        d.execute_script("return window.__poc.lyricOf(8);") == 'ダミー修正後')
+
+    tap('lyricClear')
+    time.sleep(0.4)
+    rec('歌詞だけ消せる（フォーム選択は残る）',
+        d.execute_script("return window.__poc.lyricOf(8);") == ''
+        and d.find_element(By.ID, 'b5').text == 'OK')
+
     d.get_screenshot_as_file('/home/user/work/webkit_shot.png')
 finally:
     d.quit()
