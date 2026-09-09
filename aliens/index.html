@@ -43,8 +43,15 @@ main{padding:10px 10px 92px}
 .card:active{background:#f1f1f1}
 .role{font-size:9px;font-weight:900;color:#888}
 .next .role{color:var(--pink)}
-.chord{font-size:21px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chord{font-weight:900;line-height:1.1;word-break:keep-all;overflow-wrap:break-word}
+.card .chord{font-size:21px}
 .next .chord{font-size:29px}
+/* 長い名前（Baug7(#9) / F#(b9)/Bb など）は切らずに縮める */
+.card .chord.len2{font-size:17px}
+.card .chord.len3{font-size:14px}
+.next .chord.len1{font-size:25px}
+.next .chord.len2{font-size:21px}
+.next .chord.len3{font-size:17px}
 .form{font-size:9px;color:#777;margin-top:2px;min-height:12px;word-break:break-all}
 .diagram{margin-top:6px}
 .tapmark{font-size:8px;color:var(--pink);font-weight:900;margin-top:5px}
@@ -128,7 +135,7 @@ main{padding:10px 10px 92px}
  <div class="chk"><span class="badge" id="b3">…</span><span id="t3">③ コードカードをタップ → 候補が出る</span></div>
  <div class="chk"><span class="badge" id="b4">…</span><span id="t4">④ 候補を選ぶ → ダイアグラムが即時に変わる</span></div>
  <div class="chk"><span class="badge" id="b5">…</span><span id="t5">⑤ 再読み込み後も選択が残っている</span></div>
- <div class="hint">③④を手で操作したあと、このページを<b>下に引いて再読み込み</b>してください。⑤が緑になれば受入テスト合格です。</div>
+ <div class="hint" id="hint">③④を手で操作したあと、このページを<b>下に引いて再読み込み</b>してください。⑤が緑になれば受入テスト合格です。</div>
  <div class="controls">
   <button class="ctrl alt" id="btnReload" type="button">↻ 再読み込み</button>
   <button class="ctrl alt" id="btnClear" type="button">保存を消す</button>
@@ -138,7 +145,7 @@ main{padding:10px 10px 92px}
 <div class="sectionTitle" id="sectionTitle">Intro</div>
 <div class="lyric" id="lyric">Intro（歌詞位置）<small>4/4 ・ M1</small></div>
 
-<div class="nav" id="nav"><button class="card current" type="button" data-slot="current"><div class="role">現在</div><div class="chord">CM7</div><div class="form">x32000</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">2 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">3 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:50.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button><button class="card next" type="button" data-slot="next"><div class="role">次</div><div class="chord">Baug7(b9)</div><div class="form">x21213</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:50.00%"></span></div></div><div class="sRow"><div class="sLab">2 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">3 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button><button class="card after" type="button" data-slot="after"><div class="role">その次</div><div class="chord">B7</div><div class="form">x21202</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">2 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">3 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button></div>
+<div class="nav" id="nav"><button class="card current" type="button" data-slot="current"><div class="role">現在</div><div class="chord">CM7</div><div class="form">x32000</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">2 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">3 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:50.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button><button class="card next" type="button" data-slot="next"><div class="role">次</div><div class="chord len2">Baug7(b9)</div><div class="form">x21213</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:50.00%"></span></div></div><div class="sRow"><div class="sLab">2 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">3 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button><button class="card after" type="button" data-slot="after"><div class="role">その次</div><div class="chord">B7</div><div class="form">x21202</div><div class="diagram"><div class="dg nut"><div class="sRow"><div class="sLab">1 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">2 &#9675;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="sRow"><div class="sLab">3 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">4 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:10.00%"></span></div></div><div class="sRow"><div class="sLab">5 </div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="left:30.00%"></span></div></div><div class="sRow"><div class="sLab">6 &times;</div><div class="sLine"><div class="fg"><i></i><i></i><i></i><i></i><i></i></div></div></div><div class="fretNo">1F〜</div></div></div><div class="tapmark">タップで変更</div></button></div>
 <div class="bar"><i id="codebar"></i></div>
 <div class="controls">
  <button class="ctrl" id="play" type="button">▶ 再生</button>
@@ -324,10 +331,19 @@ var cards = {
   next: document.querySelector('.card.next'),
   after: document.querySelector('.card.after')
 };
+function chordSizeClass(chord){
+  var n = chord.length;
+  if(n <= 4){ return 'chord'; }
+  if(n <= 6){ return 'chord len1'; }
+  if(n <= 9){ return 'chord len2'; }
+  return 'chord len3';
+}
 function renderCard(el, chord){
-  var opts = voicings[chord], v;
+  var opts = voicings[chord], v, ce;
   el.setAttribute('data-chord', chord);
-  el.querySelector('.chord').textContent = chord;
+  ce = el.querySelector('.chord');
+  ce.className = chordSizeClass(chord);
+  ce.textContent = chord;
   if(opts && opts.length){
     v = opts[sel(chord)];
     el.querySelector('.form').textContent = v.form;
@@ -523,6 +539,11 @@ if(restored.length){
   wait('b5');
   document.getElementById('t5').innerHTML =
     '⑤ 再読み込み後も選択が残っている（まだ保存された選択はありません）';
+}
+if(restored.length){
+  document.getElementById('hint').innerHTML =
+    '③④は読み込みのたびに「未」へ戻ります（今回のタップ待ちという意味で、失敗ではありません）。'
+    + '<b>⑤が緑なら、前回選んだフォームが再読み込み後も保持されています。</b>';
 }
 document.getElementById('btnReload').addEventListener('click', function(){
   window.location.reload();

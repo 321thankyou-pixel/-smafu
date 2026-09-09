@@ -119,6 +119,24 @@ function rec(name, ok, detail) {
     await page.getAttribute('.card.next', 'data-chord'));
   rec('index 0 の内容も正しく復元', zeroForm === zeroExpect, zeroForm);
 
+  // 実機で見つかった不具合: 「次」カードのコード名が省略されていた
+  const truncated = await page.evaluate(() => {
+    var names = Object.keys(window.__poc.voicings).concat(['N.C.']);
+    var el = document.querySelector('.card.next .chord');
+    var bad = [];
+    for (var i = 0; i < names.length; i++) {
+      el.className = (names[i].length <= 4) ? 'chord'
+        : (names[i].length <= 6) ? 'chord len1'
+        : (names[i].length <= 9) ? 'chord len2' : 'chord len3';
+      el.textContent = names[i];
+      if (el.scrollWidth > el.clientWidth + 1) bad.push(names[i] + ' (' + el.scrollWidth + '>' + el.clientWidth + ')');
+    }
+    return bad;
+  });
+  rec('全コード名がカード内に省略なしで収まる', truncated.length === 0, JSON.stringify(truncated));
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(400);
+
   await page.screenshot({ path: '/home/user/work/chromium_shot.png', fullPage: false });
   // シートを開いた状態のスクショも
   await page.tap('.card.next');
