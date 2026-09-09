@@ -215,6 +215,174 @@ function rec(name, ok, detail) {
     .filter(k => src.indexOf(k) >= 0);
   rec('ページに外部送信のコードが無い', net.length === 0, JSON.stringify(net));
 
+  // --- 演奏設定（チューニング・カポ・表記・テンポ） ---
+
+  // 実音表記が U-FRET の原曲キー表記と一致すること（半音下げ・カポなし = -1）
+  const tp = await page.evaluate(() => {
+    const t = window.__poc.transposeName;
+    return {
+      'CM7': t('CM7', -1), 'D/C': t('D/C', -1), 'Bm7': t('Bm7', -1),
+      'Em7': t('Em7', -1), 'F#m7': t('F#m7', -1), 'GM7': t('GM7', -1),
+      'C#m7-5': t('C#m7-5', -1), 'F#7': t('F#7', -1), 'E7': t('E7', -1),
+      'B7': t('B7', -1), 'Am7': t('Am7', -1), 'A7': t('A7', -1),
+      'Dm7': t('Dm7', -1), 'N.C.': t('N.C.', -1), 'F#(b9)/Bb': t('F#(b9)/Bb', -1),
+      'Baug7(b9)': t('Baug7(b9)', -1)
+    };
+  });
+  const want = { 'CM7':'BM7','D/C':'Db/B','Bm7':'Bbm7','Em7':'Ebm7','F#m7':'Fm7','GM7':'GbM7',
+    'C#m7-5':'Cm7-5','F#7':'F7','E7':'Eb7','B7':'Bb7','Am7':'Abm7','A7':'Ab7','Dm7':'Dbm7',
+    'N.C.':'N.C.','F#(b9)/Bb':'F(b9)/A','Baug7(b9)':'Bbaug7(b9)' };
+  const tpBad = Object.keys(want).filter(k => tp[k] !== want[k]).map(k => k + ':' + tp[k]);
+  rec('実音表記が原曲キー表記と一致する', tpBad.length === 0, JSON.stringify(tpBad));
+
+  // 表記切替がカードと譜面に反映される
+  await page.tap('#segView button[data-v="sound"]');
+  await page.waitForTimeout(300);
+  rec('実音表記に切り替わる（カード）',
+      (await page.textContent('.card.current .chord')).trim() === 'BM7',
+      await page.textContent('.card.current .chord'));
+  rec('実音表記に切り替わる（譜面）',
+      (await page.textContent('.mc[data-c="CM7"]')).indexOf('BM7') === 0,
+      (await page.textContent('.mc[data-c="CM7"]')).trim());
+  // 表記を変えてもフォーム辞書は元のコード名で引ける
+  await page.tap('.card.next');
+  await page.waitForTimeout(300);
+  rec('実音表記でもフォーム候補が出る',
+      (await page.$$('#voiceOptions .vopt')).length >= 2);
+  await page.tap('#closeSheet');
+  await page.waitForTimeout(200);
+
+  // キー判定
+  rec('半音下げ・カポなしで原曲キーと一致と表示',
+      (await page.textContent('#keyBox')).indexOf('原曲キーと一致') >= 0);
+  await page.tap('#segTune button[data-v="0"]');
+  await page.waitForTimeout(300);
+  rec('レギュラーにすると原曲より高いと表示',
+      (await page.textContent('#keyBox')).indexOf('原曲より') >= 0,
+      (await page.textContent('#keyBox')).slice(0, 60).replace(/\s+/g, ' '));
+  await page.tap('#segTune button[data-v="-1"]');
+  await page.waitForTimeout(300);
+
+  // カポ
+  await page.fill('#capo', '2');
+  await page.dispatchEvent('#capo', 'change');
+  await page.waitForTimeout(300);
+  rec('カポがヘッダーに出る', (await page.textContent('#meta')).indexOf('カポ2F') >= 0,
+      await page.textContent('#meta'));
+  await page.fill('#capo', '0');
+  await page.dispatchEvent('#capo', 'change');
+  await page.waitForTimeout(300);
+
+  // テンポ
+  await page.fill('#bpm', '100');
+  await page.dispatchEvent('#bpm', 'change');
+  await page.waitForTimeout(300);
+  rec('テンポ変更がヘッダーに出る', (await page.textContent('#meta')).indexOf('BPM 100') >= 0,
+      await page.textContent('#meta'));
+
+  // 設定が再読み込み後も残る
+  await page.tap('#segView button[data-v="sound"]');
+  await page.waitForTimeout(200);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(500);
+  const kept = await page.evaluate(() => window.__poc.settings);
+  rec('設定が再読み込み後も残る', kept.bpm === 100 && kept.view === 'sound', JSON.stringify(kept));
+  await page.tap('#segView button[data-v="shape"]');
+  await page.fill('#bpm', '85');
+  await page.dispatchEvent('#bpm', 'change');
+  await page.waitForTimeout(300);
+
+  // --- レビュー指摘1〜5の再発防止 ---
+
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(300);
+
+  // 指摘1: 空行でその小節の歌詞が消える
+  await page.fill('#lyricStart', '30');
+  await page.fill('#lyricInput', 'ダミーあ\nダミーい\nダミーう');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  await page.fill('#lyricStart', '30');
+  await page.fill('#lyricInput', 'ダミーあ\n\nダミーう');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  rec('空行で既存の歌詞を消せる',
+      (await page.evaluate(() => window.__poc.lyricOf(30))) === '',
+      JSON.stringify(await page.evaluate(() => [
+        window.__poc.lyricOf(29), window.__poc.lyricOf(30), window.__poc.lyricOf(31)])));
+
+  // 指摘2: 書き出す → 取り込む の往復で失われない（改行入りも含む）
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(200);
+  await page.evaluate(() => window.__poc.openLyricSheet(8));
+  await page.waitForTimeout(300);
+  await page.fill('#lyricEdit', 'ダミー1行目\nダミー2行目');
+  await page.tap('#lyricSaveOne');
+  await page.waitForTimeout(300);
+  await page.fill('#lyricInput', 'M11 ダミーさんばんめ');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  const before = await page.evaluate(() => JSON.stringify(window.__poc.lyrics));
+  await page.tap('#lyricExport');
+  await page.waitForTimeout(200);
+  const backup = await page.inputValue('#lyricInput');
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(200);
+  await page.fill('#lyricInput', backup);
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  const after = await page.evaluate(() => JSON.stringify(window.__poc.lyrics));
+  rec('書き出し→取り込みの往復で歌詞が失われない', before === after,
+      'before=' + before + ' after=' + after);
+
+  // 指摘3: 「数字＋半角スペース」で始まる行を小節番号と誤認しない
+  const heur = await page.evaluate(() =>
+    window.__poc.parseLyricText('1 ダミー\n2 ダミー\n3 ダミー\n4 ダミー\n5 ダミー', 9));
+  rec('数字＋半角スペースの行を番号と誤認しない',
+      heur.mode === 'sequential' && heur.map['8'] === '1 ダミー',
+      heur.mode + ' / ' + heur.map['8']);
+
+  // 指摘4: 保存できなかったときに画面で知らせる
+  const quota = await page.evaluate(() => {
+    var orig = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(k, v){
+      if (String(k).indexOf('aliens.lyrics') === 0) { throw new Error('QuotaExceeded'); }
+      return orig.call(this, k, v);
+    };
+    var r = window.__poc.store.set('aliens.lyrics.v1', '{}');
+    Storage.prototype.setItem = orig;
+    return r;
+  });
+  rec('保存失敗を store.set が返す', quota === false, String(quota));
+
+  // 指摘5: 壊れた保存値を復元しない
+  const guard = await page.evaluate(() => {
+    var n = window.__poc.measures.length;
+    return { arr: JSON.stringify(['a','b']), over: JSON.stringify({ '999': 'x' }), n: n };
+  });
+  await page.evaluate(v => localStorage.setItem('aliens.lyrics.v1', v), guard.arr);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(400);
+  rec('配列が保存されていても復元しない',
+      (await page.evaluate(() => JSON.stringify(window.__poc.lyrics))) === '{}');
+  await page.evaluate(v => localStorage.setItem('aliens.lyrics.v1', v), guard.over);
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForTimeout(400);
+  rec('範囲外の小節番号を復元しない',
+      (await page.evaluate(() => JSON.stringify(window.__poc.lyrics))) === '{}');
+
+  // 保存を消す は歌詞を消さない / 歌詞を全部消す はフォーム選択を消さない
+  await page.fill('#lyricInput', 'M9 ダミー分離テスト');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  await page.tap('#btnClear');
+  await page.waitForTimeout(600);
+  rec('「保存を消す」で歌詞は消えない',
+      (await page.evaluate(() => window.__poc.lyricOf(8))) === 'ダミー分離テスト');
+
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(300);
+
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(400);
   await page.screenshot({ path: '/home/user/work/chromium_shot.png', fullPage: false });

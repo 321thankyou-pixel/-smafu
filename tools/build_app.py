@@ -75,7 +75,8 @@ for mi, mm in enumerate(measures):
         prev_section = mm['section']
     total = sum(c[1] for c in mm['chords']) or 1
     cells = ''.join(
-        '<div class="mc" style="width:%.4f%%">%s<small>%d拍</small></div>' % (c[1] * 100.0 / total, c[0], c[1])
+        '<div class="mc" data-c="%s" data-b="%d" style="width:%.4f%%">%s<small>%d拍</small></div>'
+        % (c[0], c[1], c[1] * 100.0 / total, c[0], c[1])
         for c in mm['chords'])
     cue = ('<span class="cue">%s</span>' % mm['cue']) if mm['cue'] else ''
     # 歌詞は端末内にのみ保存するため、生成物には一切埋め込まない
@@ -225,6 +226,25 @@ main{padding:10px 10px 92px}
 .vnotes{display:block;font-size:10px;color:#888;margin-top:3px}
 .vsrc{display:block;font-size:9px;color:#999;margin-top:3px}
 .vsel{display:block;font-size:10px;color:var(--pink);font-weight:900;margin-top:5px}
+/* 演奏設定 */
+.setPanel{border:1px solid #ddd;border-radius:14px;padding:11px;margin-bottom:12px;background:#fcfcfc}
+.setPanel h2{font-size:12px;margin:0 0 8px}
+.setRow{display:flex;gap:8px;align-items:center;margin:0 0 8px;flex-wrap:wrap}
+.setRow>span.lab{font-size:10px;color:#666;flex:0 0 62px}
+.seg{display:flex;border:1px solid #ccc;border-radius:9px;overflow:hidden}
+.seg button{border:0;background:#fff;color:#444;font-size:11px;font-weight:900;padding:7px 10px}
+.seg button+button{border-left:1px solid #ccc}
+.seg button.on{background:#111;color:#fff}
+.setRow input[type=number]{width:58px;padding:6px 7px;border:1px solid #ccc;border-radius:8px;
+ background:#fff;color:#111;font:12px -apple-system,BlinkMacSystemFont,sans-serif;
+ -webkit-appearance:none;appearance:none}
+.setRow input[type=range]{flex:1 1 110px;min-width:90px}
+.keyBox{font-size:11px;line-height:1.7;background:#fff;border:1px solid #eee;border-radius:10px;padding:8px}
+.keyBox b{font-size:13px}
+.keyWarn{color:var(--ng);font-weight:900}
+.keyOk{color:var(--ok);font-weight:900}
+.setNote{font-size:10px;color:#888;line-height:1.6;margin:8px 0 0}
+
 /* 歌詞（端末内保存） */
 .lyricPanel{border:1px solid #ddd;border-radius:14px;padding:11px;margin-top:16px;background:#fcfcfc}
 .lyricPanel h2{font-size:12px;margin:0 0 6px}
@@ -255,11 +275,33 @@ main{padding:10px 10px 92px}
 <div class="app">
 <header>
  <h1>エイリアンズ</h1>
- <div class="meta">Play: G / 半音下げチューニング ・ 4/4 ・ BPM 85 ・ 126小節</div>
+ <div class="meta" id="meta">4/4 ・ 126小節</div>
 </header>
 <main>
 
 <div id="errbox"></div>
+
+<div class="setPanel">
+ <h2>演奏設定</h2>
+ <div class="setRow"><span class="lab">チューニング</span>
+  <span class="seg" id="segTune">
+   <button type="button" data-v="-1">半音下げ</button>
+   <button type="button" data-v="0">レギュラー</button>
+  </span></div>
+ <div class="setRow"><span class="lab">カポ</span>
+  <input id="capo" type="number" min="0" max="7" step="1" value="0"><span class="lab">フレット</span></div>
+ <div class="setRow"><span class="lab">コード表記</span>
+  <span class="seg" id="segView">
+   <button type="button" data-v="shape">押さえる形</button>
+   <button type="button" data-v="sound">実音</button>
+  </span></div>
+ <div class="setRow"><span class="lab">テンポ</span>
+  <input id="bpm" type="number" min="40" max="200" step="1" value="85">
+  <input id="bpmRange" type="range" min="60" max="120" step="1" value="85"></div>
+ <div class="keyBox" id="keyBox"></div>
+ <p class="setNote">「押さえる形」は指で押さえるコード名（この譜面の基準）。「実音」は実際に鳴る音の名前で、
+  U-FRETなどの原曲キー表記と揃います。ダイアグラムのフレット番号は、カポを付けた場合はカポからの数です。</p>
+</div>
 
 <div class="panel">
  <h2>iPhone Safari 受入テスト</h2>
@@ -290,6 +332,7 @@ main{padding:10px 10px 92px}
  <p>入力した歌詞は<b>あなたの端末の中だけ</b>に保存されます。どこにも送信されず、公開もされません。<br>
   書式は2通り。どちらでも読み取ります。<br>
   ・<b>小節番号つき</b>：<code>M9 歌詞</code> / <code>9: 歌詞</code> のように行頭に小節番号<br>
+  　（番号だけ書いて中身を空にすると、その小節の歌詞を消せます）<br>
   ・<b>番号なし</b>：1行＝1小節。下の「開始小節」から順に割り当てます（空行はその小節を空にします）</p>
  <textarea id="lyricInput" placeholder="M9 …&#10;M10 …&#10;&#10;または1行＝1小節で貼り付け"></textarea>
  <div class="lyricRow">
@@ -359,7 +402,11 @@ var store = (function(){
     },
     set: function(k,v){
       v = String(v); mem[k] = v;
-      if(usable){ try{ localStorage.setItem(k,v); }catch(e){} }
+      if(usable){
+        try{ localStorage.setItem(k,v); return true; }
+        catch(e){ return false; }   /* 容量超過など。呼び出し側が失敗を知れるようにする */
+      }
+      return false;                 /* メモリのみ＝再読み込みで消える */
     },
     remove: function(k){
       delete mem[k];
@@ -411,20 +458,76 @@ var restored = [];
 })();
 function sel(chord){ return selected.hasOwnProperty(chord) ? selected[chord] : 0; }
 
+/* ---------- 演奏設定（チューニング・カポ・表記・テンポ） ---------- */
+var SET_KEY = 'aliens.settings.v1';
+var SHAPE_KEY_PC = 7;    /* この譜面が前提とする「押さえる形」のキー = G */
+var ORIG_KEY_PC = 6;     /* 原曲キー = F# */
+var KEYNAME = ['C','C#/Db','D','D#/Eb','E','F','F#/Gb','G','G#/Ab','A','A#/Bb','B'];
+var FLATN  = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+var SHARPN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+var PCMAP = {'C':0,'C#':1,'Db':1,'D':2,'D#':3,'Eb':3,'E':4,'F':5,'F#':6,'Gb':6,
+             'G':7,'G#':8,'Ab':8,'A':9,'A#':10,'Bb':10,'B':11};
+var settings = { tune: -1, capo: 0, view: 'shape', bpm: 85 };
+(function(){
+  var raw = store.get(SET_KEY), o = null;
+  if(!raw){ return; }
+  try { o = JSON.parse(raw); } catch(e) { o = null; }
+  if(!o || typeof o !== 'object'){ return; }
+  if(o.tune === -1 || o.tune === 0){ settings.tune = o.tune; }
+  if(typeof o.capo === 'number' && o.capo >= 0 && o.capo <= 7){ settings.capo = Math.floor(o.capo); }
+  if(o.view === 'shape' || o.view === 'sound'){ settings.view = o.view; }
+  if(typeof o.bpm === 'number' && o.bpm >= 40 && o.bpm <= 200){ settings.bpm = Math.floor(o.bpm); }
+})();
+function saveSettings(){ store.set(SET_KEY, JSON.stringify(settings)); }
+function shiftRoot(r, n, flat){
+  if(!PCMAP.hasOwnProperty(r)){ return r; }
+  var pc = (PCMAP[r] + n) % 12;
+  if(pc < 0){ pc += 12; }
+  return flat ? FLATN[pc] : SHARPN[pc];
+}
+function transposeName(name, n){
+  if(n === 0 || name === 'N.C.'){ return name; }
+  var flat = n < 0, parts = String(name).split('/'), m, b, out;
+  m = parts[0].match(/^([A-G][#b]?)(.*)$/);
+  if(!m){ return name; }
+  out = shiftRoot(m[1], n, flat) + m[2];
+  if(parts.length > 1){
+    b = parts[1].match(/^([A-G][#b]?)(.*)$/);
+    out += '/' + (b ? shiftRoot(b[1], n, flat) + b[2] : parts[1]);
+  }
+  return out;
+}
+function soundShift(){ return settings.tune + settings.capo; }
+function dispChord(c){
+  return settings.view === 'sound' ? transposeName(c, soundShift()) : c;
+}
+
 /* ---------- 歌詞（端末内にのみ保存。ネットワークへは一切送らない） ---------- */
 var LYRIC_KEY = 'aliens.lyrics.v1';
 var lyrics = {};
 (function(){
-  var raw = store.get(LYRIC_KEY), obj = null, k;
+  var raw = store.get(LYRIC_KEY), obj = null, k, n, v;
   if(!raw){ return; }
   try { obj = JSON.parse(raw); } catch(e) { obj = null; }
   if(!obj || typeof obj !== 'object'){ return; }
+  if(Object.prototype.toString.call(obj) === '[object Array]'){ return; }
   for(k in obj){
-    if(obj.hasOwnProperty(k) && typeof obj[k] === 'string' && obj[k] !== ''){
-      lyrics[k] = obj[k];
-    }
+    if(!obj.hasOwnProperty(k)){ continue; }
+    if(!/^\d{1,3}$/.test(k)){ continue; }          /* 小節番号でないキーは捨てる */
+    n = parseInt(k, 10);
+    if(n < 0 || n >= measures.length){ continue; }  /* 範囲外は捨てる */
+    if(typeof obj[k] !== 'string'){ continue; }
+    v = normLyric(obj[k]);
+    if(v !== ''){ lyrics[String(n)] = v; }
   }
 })();
+function normLyric(t){
+  /* 1小節＝1行として扱う。改行・タブは空白1つにまとめ、
+     「書き出す→取り込む」の往復で行が失われないようにする */
+  return String(t).replace(/[\\r\\n\\t]+/g, ' ')
+                  .replace(/^\s+|\s+$/g, '')
+                  .replace(/  +/g, ' ');
+}
 function lyricOf(mi){
   var k = String(mi);
   return lyrics.hasOwnProperty(k) ? lyrics[k] : '';
@@ -435,8 +538,15 @@ function lyricCount(){
   return n;
 }
 function saveLyrics(){
-  store.set(LYRIC_KEY, JSON.stringify(lyrics));
+  var ok = store.set(LYRIC_KEY, JSON.stringify(lyrics));
   store.set(STAMP_KEY, new Date().toISOString());
+  if(!ok){
+    document.getElementById('lyricStat').innerHTML =
+      '<span class="keyWarn">端末に保存できませんでした</span>'
+      + '（保存領域がいっぱいか、プライベートブラウズの可能性があります）。'
+      + 'このまま再読み込みすると入力内容は消えます。「書き出す」で控えを取ってください。';
+  }
+  return ok;
 }
 function esc(t){
   return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -444,13 +554,13 @@ function esc(t){
 function matchNumbered(line){
   var m = line.match(/^[Mm]\s*(\d{1,3})\s*[:\\uff1a]?\s*(.*)$/);
   if(!m){ m = line.match(/^(\d{1,3})\s*[:\\uff1a]\s*(.*)$/); }
-  if(!m){ m = line.match(/^(\d{1,3})[ \\t\\u3000]+(.*)$/); }
+  if(!m){ m = line.match(/^(\d{1,3})[\\t\\u3000]+(.*)$/); }
   if(!m){ return null; }
   return { no: parseInt(m[1], 10), text: m[2] };
 }
 function parseLyricText(text, startNo){
   var raw = String(text).split('\\n'), lines = [], i, ln, hit = 0, nonEmpty = 0,
-      out = {}, mi, mm;
+      out = {}, mi, mm, del = [], skipped = 0, over = 0, txt;
   for(i = 0; i < raw.length; i++){
     ln = raw[i];
     if(ln.charAt(ln.length - 1) === '\\r'){ ln = ln.slice(0, -1); }
@@ -460,25 +570,31 @@ function parseLyricText(text, startNo){
       if(matchNumbered(ln)){ hit++; }
     }
   }
-  if(nonEmpty === 0){ return { mode: 'empty', map: {}, count: 0 }; }
+  if(nonEmpty === 0){
+    return { mode: 'empty', map: {}, del: [], count: 0, skipped: 0, over: 0 };
+  }
   if(hit >= Math.ceil(nonEmpty * 0.6)){
     for(i = 0; i < lines.length; i++){
+      if(lines[i].replace(/^\s+|\s+$/g, '') === ''){ continue; }
       mm = matchNumbered(lines[i]);
-      if(!mm){ continue; }
+      if(!mm){ skipped++; continue; }   /* 番号の無い行。黙って捨てずに報告する */
       mi = mm.no - 1;
-      if(mi < 0 || mi >= measures.length){ continue; }
-      if(mm.text !== ''){ out[String(mi)] = mm.text; }
+      if(mi < 0 || mi >= measures.length){ over++; continue; }
+      txt = normLyric(mm.text);
+      if(txt !== ''){ out[String(mi)] = txt; } else { del.push(mi); }
     }
-    return { mode: 'numbered', map: out, count: countKeys(out) };
+    return { mode: 'numbered', map: out, del: del,
+             count: countKeys(out), skipped: skipped, over: over };
   }
   mi = startNo - 1;
   for(i = 0; i < lines.length; i++){
-    if(mi >= measures.length){ break; }
-    ln = lines[i].replace(/^\s+|\s+$/g, '');
-    if(ln !== ''){ out[String(mi)] = ln; }
+    if(mi >= measures.length){ over++; mi++; continue; }
+    txt = normLyric(lines[i]);
+    if(txt !== ''){ out[String(mi)] = txt; } else { del.push(mi); }  /* 空行はその小節を空にする */
     mi++;
   }
-  return { mode: 'sequential', map: out, count: countKeys(out) };
+  return { mode: 'sequential', map: out, del: del,
+           count: countKeys(out), skipped: 0, over: over };
 }
 function countKeys(o){ var n = 0, k; for(k in o){ if(o.hasOwnProperty(k)){ n++; } } return n; }
 function exportLyricText(){
@@ -551,10 +667,13 @@ for(mi=0;mi<measures.length;mi++){
     seq.push({mi:mi, chord:mm.chords[ci][0], beats:mm.chords[ci][1]});
   }
 }
-var BPM = 85, BEATMS = 60000 / BPM;
-var totalBeats = 0;
+var BEATMS, duration, totalBeats = 0;
 for(mi=0;mi<seq.length;mi++){ totalBeats += seq[mi].beats; }
-var duration = totalBeats * BEATMS;
+function applyBPM(){
+  BEATMS = 60000 / settings.bpm;
+  duration = totalBeats * BEATMS;
+}
+applyBPM();
 
 /* ---------- カード ---------- */
 var cards = {
@@ -573,8 +692,8 @@ function renderCard(el, chord){
   var opts = voicings[chord], v, ce;
   el.setAttribute('data-chord', chord);
   ce = el.querySelector('.chord');
-  ce.className = chordSizeClass(chord);
-  ce.textContent = chord;
+  ce.className = chordSizeClass(dispChord(chord));
+  ce.textContent = dispChord(chord);
   if(opts && opts.length){
     v = opts[sel(chord)];
     el.querySelector('.form').textContent = v.form;
@@ -594,6 +713,54 @@ function paintScoreLyrics(){
     t = lyricOf(mi);
     els[i].innerHTML = t ? esc(t) : '';
   }
+}
+function paintScoreChords(){
+  var els = document.querySelectorAll('.mc[data-c]'), i, c, b;
+  for(i = 0; i < els.length; i++){
+    c = els[i].getAttribute('data-c');
+    b = els[i].getAttribute('data-b');
+    els[i].innerHTML = esc(dispChord(c)) + '<small>' + b + '拍</small>';
+  }
+}
+function paintSettings(){
+  var shift = soundShift(),
+      soundPc = ((SHAPE_KEY_PC + shift) % 12 + 12) % 12,
+      diff = ((soundPc - ORIG_KEY_PC) % 12 + 12) % 12,
+      tuneLabel = (settings.tune === -1 ? '半音下げ' : 'レギュラー'),
+      capoLabel = (settings.capo === 0 ? 'カポなし' : 'カポ' + settings.capo + 'F'),
+      html, judge;
+  document.getElementById('meta').textContent =
+    tuneLabel + ' ・ ' + capoLabel + ' ・ 4/4 ・ BPM ' + settings.bpm
+    + ' ・ ' + measures.length + '小節';
+  if(diff === 0){
+    judge = '<span class="keyOk">原曲キーと一致</span>';
+  } else {
+    judge = '<span class="keyWarn">原曲より' + (diff <= 6 ? '半音' + diff + 'つ高い' : '半音' + (12 - diff) + 'つ低い')
+          + '</span>';
+  }
+  html = '押さえる形のキー <b>' + KEYNAME[SHAPE_KEY_PC] + '</b>'
+       + '　→　実際に鳴るキー <b>' + KEYNAME[soundPc] + '</b>　' + judge + '<br>'
+       + '原曲キー ' + KEYNAME[ORIG_KEY_PC] + '（' + tuneLabel + '・' + capoLabel + 'のとき'
+       + (diff === 0 ? '一致します' : '一致しません') + '）';
+  if(settings.view === 'sound' && shift !== 0){
+    html += '<br>いまは<b>実音</b>で表記しています（押さえる形より半音'
+          + (shift < 0 ? (-shift) + 'つ低い' : shift + 'つ高い') + '名前です）';
+  }
+  document.getElementById('keyBox').innerHTML = html;
+  var i, btns = document.querySelectorAll('#segTune button');
+  for(i = 0; i < btns.length; i++){
+    btns[i].className = (parseInt(btns[i].getAttribute('data-v'), 10) === settings.tune) ? 'on' : '';
+  }
+  btns = document.querySelectorAll('#segView button');
+  for(i = 0; i < btns.length; i++){
+    btns[i].className = (btns[i].getAttribute('data-v') === settings.view) ? 'on' : '';
+  }
+  document.getElementById('capo').value = settings.capo;
+  document.getElementById('bpm').value = settings.bpm;
+  document.getElementById('bpmRange').value = settings.bpm;
+}
+function repaintAll(){
+  paintSettings(); paintScoreChords(); redraw(true);
 }
 function paintLyricStat(){
   var n = lyricCount(), el = document.getElementById('lyricStat');
@@ -649,7 +816,7 @@ function showSheet(){
 function openLyricSheet(mi){
   sheetMode = 'lyric'; sheetMi = mi; sheetChord = null;
   var m = measures[mi], names = [], i;
-  for(i = 0; i < m.chords.length; i++){ names.push(m.chords[i][0]); }
+  for(i = 0; i < m.chords.length; i++){ names.push(dispChord(m.chords[i][0])); }
   document.getElementById('sheetTitle').textContent = 'M' + (mi + 1) + ' の歌詞';
   document.getElementById('sheetNote').innerHTML =
     m.section + (m.cue ? ' \\u30fb ' + m.cue : '') + ' \\u30fb ' + names.join(' / ')
@@ -660,7 +827,7 @@ function openLyricSheet(mi){
     + '<button class="ctrl alt sm" id="lyricCancel" type="button">やめる</button></div>';
   document.getElementById('lyricEdit').value = lyricOf(mi);
   document.getElementById('lyricSaveOne').addEventListener('click', function(){
-    var v = document.getElementById('lyricEdit').value.replace(/^\s+|\s+$/g, '');
+    var v = normLyric(document.getElementById('lyricEdit').value);
     if(v === ''){ delete lyrics[String(mi)]; } else { lyrics[String(mi)] = v; }
     saveLyrics(); paintScoreLyrics(); paintLyricStat(); redraw(true); closeSheet();
   }, false);
@@ -670,7 +837,8 @@ function openLyricSheet(mi){
 function openSheet(chord){
   sheetMode = 'voicing'; sheetMi = -1;
   sheetChord = chord;
-  document.getElementById('sheetTitle').textContent = chord + ' のフォーム';
+  document.getElementById('sheetTitle').textContent =
+    dispChord(chord) + (dispChord(chord) !== chord ? '（押さえる形 ' + chord + '）' : '') + ' のフォーム';
   document.getElementById('sheetNote').innerHTML =
     '表示するフォームを選びます。選択は同じコード名の全出現箇所に適用され、この端末に保存されます。<br>'
     + '掲載フォームは構成音を機械検証済み（押弦4本以内・4フレット幅以内）。';
@@ -830,11 +998,50 @@ if(restored.length){
     '③④は読み込みのたびに「未」へ戻ります（今回のタップ待ちという意味で、失敗ではありません）。'
     + '<b>⑤が緑なら、前回選んだフォームが再読み込み後も保持されています。</b>';
 }
+(function(){
+  var i, btns;
+  function bindSeg(sel, apply){
+    var list = document.querySelectorAll(sel), k;
+    function bindOne(b){
+      b.addEventListener('click', function(){
+        apply(b.getAttribute('data-v'));
+        saveSettings(); repaintAll();
+      }, false);
+    }
+    for(k = 0; k < list.length; k++){ bindOne(list[k]); }
+  }
+  bindSeg('#segTune button', function(v){ settings.tune = parseInt(v, 10); });
+  bindSeg('#segView button', function(v){ settings.view = v; });
+
+  document.getElementById('capo').addEventListener('change', function(){
+    var n = parseInt(this.value, 10);
+    if(isNaN(n) || n < 0){ n = 0; }
+    if(n > 7){ n = 7; }
+    settings.capo = n; saveSettings(); repaintAll();
+  }, false);
+
+  function setBpm(v){
+    var n = parseInt(v, 10);
+    if(isNaN(n)){ return; }
+    if(n < 40){ n = 40; }
+    if(n > 200){ n = 200; }
+    settings.bpm = n;
+    applyBPM();
+    if(pos > duration){ pos = duration; }
+    saveSettings(); paintSettings();
+    tick(playing ? ((new Date().getTime()) - startT) : pos);
+  }
+  document.getElementById('bpm').addEventListener('change', function(){ setBpm(this.value); }, false);
+  document.getElementById('bpmRange').addEventListener('input', function(){ setBpm(this.value); }, false);
+  document.getElementById('bpmRange').addEventListener('change', function(){ setBpm(this.value); }, false);
+  document.getElementById('lyricStart').setAttribute('max', String(measures.length));
+})();
+
 document.getElementById('lyricApply').addEventListener('click', function(){
   var ta = document.getElementById('lyricInput'),
       startEl = document.getElementById('lyricStart'),
       start = parseInt(startEl.value, 10),
-      res, k;
+      res, k, di, msg;
   if(isNaN(start) || start < 1){ start = 1; }
   if(start > measures.length){ start = measures.length; }
   res = parseLyricText(ta.value, start);
@@ -843,10 +1050,19 @@ document.getElementById('lyricApply').addEventListener('click', function(){
     return;
   }
   for(k in res.map){ if(res.map.hasOwnProperty(k)){ lyrics[k] = res.map[k]; } }
-  saveLyrics(); paintScoreLyrics(); redraw(true); paintLyricStat();
-  document.getElementById('lyricStat').innerHTML +=
-    '　/　今回 <b>' + res.count + '</b> 小節を取り込みました（'
-    + (res.mode === 'numbered' ? '小節番号つきとして読み取り' : 'M' + start + ' から順に割り当て') + '）';
+  for(di = 0; di < res.del.length; di++){ delete lyrics[String(res.del[di])]; }
+  if(!saveLyrics()){ paintScoreLyrics(); redraw(true); return; }
+  paintScoreLyrics(); redraw(true); paintLyricStat();
+  msg = '　/　今回 <b>' + res.count + '</b> 小節を取り込みました（'
+      + (res.mode === 'numbered' ? '小節番号つきとして読み取り' : 'M' + start + ' から順に割り当て') + '）';
+  if(res.del.length){ msg += '　/　空行のため <b>' + res.del.length + '</b> 小節を空にしました'; }
+  if(res.skipped){
+    msg += '　/　<span class="keyWarn">小節番号の無い ' + res.skipped + ' 行は取り込めませんでした</span>';
+  }
+  if(res.over){
+    msg += '　/　<span class="keyWarn">範囲外の ' + res.over + ' 行は無視しました</span>';
+  }
+  document.getElementById('lyricStat').innerHTML += msg;
   ta.value = '';
 }, false);
 document.getElementById('lyricExport').addEventListener('click', function(){
@@ -866,7 +1082,7 @@ document.getElementById('lyricClear').addEventListener('click', function(){
   store.remove(LYRIC_KEY);
   paintScoreLyrics(); redraw(true); paintLyricStat();
 }, false);
-paintScoreLyrics(); paintLyricStat();
+paintScoreLyrics(); paintLyricStat(); paintSettings(); paintScoreChords();
 
 document.getElementById('btnReload').addEventListener('click', function(){
   window.location.reload();
@@ -884,7 +1100,8 @@ window.__poc = {
   voicings: voicings, diagram: diagram, store: store, restored: restored,
   openLyricSheet: openLyricSheet, lyrics: lyrics, lyricOf: lyricOf,
   parseLyricText: parseLyricText, exportLyricText: exportLyricText,
-  measures: measures
+  measures: measures, settings: settings, transposeName: transposeName,
+  dispChord: dispChord, normLyric: normLyric, repaintAll: repaintAll
 };
 })();
 </script>

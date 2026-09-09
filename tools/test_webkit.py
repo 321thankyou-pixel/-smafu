@@ -12,6 +12,13 @@ def rec(name, ok, detail=''):
     results.append((name, ok, detail))
     print(('PASS ' if ok else 'FAIL ') + name + ('  ' + detail if detail else ''))
 
+def sclick(d, el):
+    """固定バーやスクロール位置に邪魔されずにクリックする"""
+    import time as _t
+    d.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
+    _t.sleep(0.25)
+    el.click()
+
 opts = Options()
 opts.set_capability('browserName', 'MiniBrowser')
 opts.set_capability('webkitgtk:browserOptions', {'args': ['--automation']})
@@ -45,7 +52,7 @@ try:
         before_form not in ('', 'フォーム未登録'), before_form)
     rec('ダイアグラムのドットが描画されている', len(before_dots) > 0, before_dots)
 
-    nextcard.click()
+    sclick(d, nextcard)
     time.sleep(0.6)
     rec('③ タップでボトムシートが開く',
         'open' in d.find_element(By.ID, 'sheet').get_attribute('class'))
@@ -55,7 +62,7 @@ try:
 
     # 2番目の候補を選択
     target_form = opts_el[1].find_element(By.CSS_SELECTOR, '.vform').text
-    opts_el[1].click()
+    sclick(d, opts_el[1])
     time.sleep(0.6)
     after_form = d.execute_script(
         "return document.querySelector('.card.next .form').textContent")
@@ -74,7 +81,7 @@ try:
         "return localStorage.getItem('aliens.voicing.' + arguments[0])", chord)
     rec('選択が localStorage に保存された', saved == '1', 'value=%r' % saved)
 
-    d.find_element(By.ID, 'closeSheet').click()
+    sclick(d, d.find_element(By.ID, 'closeSheet'))
     time.sleep(0.4)
     rec('シートが閉じる', 'open' not in d.find_element(By.ID, 'sheet').get_attribute('class'))
 
@@ -89,7 +96,7 @@ try:
         d.find_element(By.ID, 't5').text[:80])
 
     # スクリムで閉じられるか (iOS Safari の div タップ問題対策の確認)
-    d.find_element(By.CSS_SELECTOR, '.card.current').click()
+    sclick(d, d.find_element(By.CSS_SELECTOR, '.card.current'))
     time.sleep(0.5)
     from selenium.webdriver.common.action_chains import ActionChains
     scrim = d.find_element(By.ID, 'scrim')
@@ -140,11 +147,11 @@ try:
     d.execute_script("window.__poc.closeSheet();")
     time.sleep(0.3)
 
-    d.find_element(By.CSS_SELECTOR, '.card.next').click()
+    sclick(d, d.find_element(By.CSS_SELECTOR, '.card.next'))
     time.sleep(0.4)
-    d.find_elements(By.CSS_SELECTOR, '#voiceOptions .vopt')[0].click()
+    sclick(d, d.find_elements(By.CSS_SELECTOR, '#voiceOptions .vopt')[0])
     time.sleep(0.4)
-    d.find_element(By.ID, 'closeSheet').click()
+    sclick(d, d.find_element(By.ID, 'closeSheet'))
     d.refresh()
     time.sleep(1.2)
     rec('index 0 を選び直しても⑤が OK',
@@ -159,10 +166,7 @@ try:
         filled[0] == 126 and filled[1] == 0, str(filled))
 
     def tap(el_id):
-        el = d.find_element(By.ID, el_id)
-        d.execute_script("arguments[0].scrollIntoView({block:'center'});", el)
-        time.sleep(0.2)
-        el.click()
+        sclick(d, d.find_element(By.ID, el_id))
 
     ta = d.find_element(By.ID, 'lyricInput')
     d.execute_script("arguments[0].scrollIntoView({block:'center'});", ta)
@@ -180,10 +184,7 @@ try:
     rec('譜面の該当小節に歌詞が出る',
         d.find_element(By.CSS_SELECTOR, '[data-mlyric="8"]').text.strip() == 'ダミー歌詞A')
 
-    mini = d.find_element(By.CSS_SELECTOR, '.mini[data-mi="8"]')
-    d.execute_script("arguments[0].scrollIntoView({block:'center'});", mini)
-    time.sleep(0.2)
-    mini.click()
+    sclick(d, d.find_element(By.CSS_SELECTOR, '.mini[data-mi="8"]'))
     time.sleep(0.5)
     rec('小節タップで歌詞編集シートが開く',
         'M9' in d.find_element(By.ID, 'sheetTitle').text,
@@ -201,6 +202,43 @@ try:
     rec('歌詞だけ消せる（フォーム選択は残る）',
         d.execute_script("return window.__poc.lyricOf(8);") == ''
         and d.find_element(By.ID, 'b5').text == 'OK')
+
+    # --- 演奏設定（チューニング・カポ・表記・テンポ） ---
+    sclick(d, d.find_element(By.CSS_SELECTOR, '#segView button[data-v="sound"]'))
+    time.sleep(0.4)
+    rec('実音表記に切り替わる（カード）',
+        d.find_element(By.CSS_SELECTOR, '.card.current .chord').text.strip() == 'BM7',
+        d.find_element(By.CSS_SELECTOR, '.card.current .chord').text)
+    rec('実音表記に切り替わる（譜面）',
+        d.find_element(By.CSS_SELECTOR, '.mc[data-c="CM7"]').text.strip().startswith('BM7'),
+        d.find_element(By.CSS_SELECTOR, '.mc[data-c="CM7"]').text.strip())
+    sclick(d, d.find_element(By.CSS_SELECTOR, '.card.next'))
+    time.sleep(0.4)
+    rec('実音表記でもフォーム候補が出る',
+        len(d.find_elements(By.CSS_SELECTOR, '#voiceOptions .vopt')) >= 2)
+    sclick(d, d.find_element(By.ID, 'closeSheet'))
+    time.sleep(0.3)
+
+    rec('半音下げ・カポなしで原曲キーと一致と表示',
+        '原曲キーと一致' in d.find_element(By.ID, 'keyBox').text)
+    sclick(d, d.find_element(By.CSS_SELECTOR, '#segTune button[data-v="0"]'))
+    time.sleep(0.4)
+    rec('レギュラーにすると原曲より高いと表示',
+        '原曲より' in d.find_element(By.ID, 'keyBox').text)
+    sclick(d, d.find_element(By.CSS_SELECTOR, '#segTune button[data-v="-1"]'))
+    time.sleep(0.3)
+
+    d.execute_script(
+        "var e=document.getElementById('bpm'); e.value='100';"
+        "e.dispatchEvent(new Event('change'));")
+    time.sleep(0.4)
+    rec('テンポ変更がヘッダーに出る', 'BPM 100' in d.find_element(By.ID, 'meta').text,
+        d.find_element(By.ID, 'meta').text)
+    d.refresh()
+    time.sleep(1.2)
+    rec('設定が再読み込み後も残る',
+        d.execute_script("return window.__poc.settings.bpm;") == 100
+        and d.execute_script("return window.__poc.settings.view;") == 'sound')
 
     d.get_screenshot_as_file('/home/user/work/webkit_shot.png')
 finally:
