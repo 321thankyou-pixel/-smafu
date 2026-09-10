@@ -4,6 +4,7 @@
 import sys, time, json
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.webkitgtk.options import Options
 
 URL = sys.argv[1] if len(sys.argv) > 1 else 'http://127.0.0.1:8765/index.html'
@@ -189,14 +190,63 @@ try:
     rec('小節タップで歌詞編集シートが開く',
         'M9' in d.find_element(By.ID, 'sheetTitle').text,
         d.find_element(By.ID, 'sheetTitle').text)
+    rec('拍ごとの入力欄が拍数ぶん出る',
+        len(d.find_elements(By.CSS_SELECTOR, '#voiceOptions .lfield')) == 4,
+        str(len(d.find_elements(By.CSS_SELECTOR, '#voiceOptions .lfield'))))
     rec('編集欄に既存の歌詞が入っている',
-        d.find_element(By.ID, 'lyricEdit').get_attribute('value') == 'ダミー歌詞A')
-    d.execute_script("document.getElementById('lyricEdit').value='ダミー修正後';")
+        d.find_element(By.CSS_SELECTOR, '.lfield[data-b="0"]').get_attribute('value')
+        == 'ダミー歌詞A')
+    d.execute_script(
+        "document.querySelector('.lfield[data-b=\"0\"]').value='ダミー修正後';")
     tap('lyricSaveOne')
     time.sleep(0.4)
-    rec('1小節だけ直せる',
-        d.execute_script("return window.__poc.lyricOf(8);") == 'ダミー修正後')
+    rec('1拍だけ直せる',
+        d.execute_script("return window.__poc.lyricAt(8, 0);") == 'ダミー修正後')
 
+    # 拍単位の位置合わせ
+    tap('lyricClear')
+    time.sleep(0.4)
+    ta2 = d.find_element(By.ID, 'lyricInput')
+    d.execute_script("arguments[0].scrollIntoView({block:'center'});", ta2)
+    ta2.clear()
+    ta2.send_keys('M9 ダミーあ')
+    ta2.send_keys(Keys.ENTER)
+    ta2.send_keys('M9.3 ダミーい')
+    tap('lyricApply')
+    time.sleep(0.4)
+    rec('小節.拍 書式で拍を指定できる',
+        d.execute_script("return JSON.stringify(window.__poc.lyrics);")
+        == '{"8.0":"ダミーあ","8.2":"ダミーい"}',
+        d.execute_script("return JSON.stringify(window.__poc.lyrics);"))
+    rec('譜面が拍のマス目で表示する',
+        len(d.find_elements(By.CSS_SELECTOR, '[data-mlyric="8"] .mlb')) == 4)
+
+    d.execute_script("window.__poc.openLyricSheet(8);")
+    time.sleep(0.5)
+    sclick(d, d.find_element(By.CSS_SELECTOR, '.lnudge[data-b="2"][data-d="1"]'))
+    time.sleep(0.5)
+    rec('→ で1拍うしろへ動く',
+        d.execute_script("return window.__poc.lyrics['8.3'];") == 'ダミーい',
+        d.execute_script("return JSON.stringify(window.__poc.lyrics);"))
+    sclick(d, d.find_element(By.CSS_SELECTOR, '.lnudge[data-b="3"][data-d="1"]'))
+    time.sleep(0.5)
+    rec('小節をまたいで動く',
+        d.execute_script("return window.__poc.lyrics['9.0'];") == 'ダミーい')
+    rec('動かした先の小節にシートが移る',
+        d.find_element(By.ID, 'sheetTitle').text.startswith('M10'),
+        d.find_element(By.ID, 'sheetTitle').text)
+    d.execute_script("window.__poc.closeSheet();")
+    time.sleep(0.3)
+
+    tap('shiftM1')
+    time.sleep(0.4)
+    rec('全体を1小節うしろへずらせる',
+        d.execute_script("return JSON.stringify(window.__poc.lyrics);")
+        == '{"9.0":"ダミーあ","10.0":"ダミーい"}',
+        d.execute_script("return JSON.stringify(window.__poc.lyrics);"))
+
+    tap('lyricClear')
+    time.sleep(0.4)
     tap('lyricClear')
     time.sleep(0.4)
     rec('歌詞だけ消せる（フォーム選択は残る）',

@@ -187,8 +187,11 @@ function rec(name, ok, detail) {
       (await page.textContent('#sheetTitle')).indexOf('M9') >= 0,
       await page.textContent('#sheetTitle'));
   rec('編集欄に既存の歌詞が入っている',
-      (await page.inputValue('#lyricEdit')) === 'ダミー歌詞A');
-  await page.fill('#lyricEdit', 'ダミー修正後');
+      (await page.inputValue('.lfield[data-b="0"]')) === 'ダミー歌詞A');
+  rec('拍ごとの入力欄が拍数ぶん出る',
+      (await page.$$('#voiceOptions .lfield')).length === 4,
+      String((await page.$$('#voiceOptions .lfield')).length));
+  await page.fill('.lfield[data-b="0"]', 'ダミー修正後');
   await page.tap('#lyricSaveOne');
   await page.waitForTimeout(300);
   rec('1小節だけ直せる',
@@ -316,7 +319,7 @@ function rec(name, ok, detail) {
   await page.waitForTimeout(200);
   await page.evaluate(() => window.__poc.openLyricSheet(8));
   await page.waitForTimeout(300);
-  await page.fill('#lyricEdit', 'ダミー1行目\nダミー2行目');
+  await page.fill('.lfield[data-b="0"]', 'ダミー1行目\nダミー2行目');
   await page.tap('#lyricSaveOne');
   await page.waitForTimeout(300);
   await page.fill('#lyricInput', 'M11 ダミーさんばんめ');
@@ -339,8 +342,8 @@ function rec(name, ok, detail) {
   const heur = await page.evaluate(() =>
     window.__poc.parseLyricText('1 ダミー\n2 ダミー\n3 ダミー\n4 ダミー\n5 ダミー', 9));
   rec('数字＋半角スペースの行を番号と誤認しない',
-      heur.mode === 'sequential' && heur.map['8'] === '1 ダミー',
-      heur.mode + ' / ' + heur.map['8']);
+      heur.mode === 'sequential' && heur.map['8.0'] === '1 ダミー',
+      heur.mode + ' / ' + heur.map['8.0']);
 
   // 指摘4: 保存できなかったときに画面で知らせる
   const quota = await page.evaluate(() => {
@@ -383,6 +386,113 @@ function rec(name, ok, detail) {
   await page.tap('#lyricClear');
   await page.waitForTimeout(300);
 
+  // --- 拍単位の位置合わせ ---
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(300);
+
+  // 「小節.拍」書式で拍を指定して取り込める
+  await page.fill('#lyricInput', 'M9 ダミーあ\nM9.3 ダミーい\nM10.4 ダミーう');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  rec('小節.拍 書式で拍を指定できる',
+      (await page.evaluate(() => JSON.stringify(window.__poc.lyrics)))
+        === '{"8.0":"ダミーあ","8.2":"ダミーい","9.3":"ダミーう"}',
+      await page.evaluate(() => JSON.stringify(window.__poc.lyrics)));
+
+  // 書き出し→取り込みで拍位置が保たれる
+  const beatBefore = await page.evaluate(() => JSON.stringify(window.__poc.lyrics));
+  await page.tap('#lyricExport');
+  await page.waitForTimeout(200);
+  const beatBackup = await page.inputValue('#lyricInput');
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(200);
+  await page.fill('#lyricInput', beatBackup);
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  rec('書き出し→取り込みで拍位置が保たれる',
+      (await page.evaluate(() => JSON.stringify(window.__poc.lyrics))) === beatBefore,
+      beatBackup.replace(/\n/g, ' | '));
+
+  // 譜面が拍のマス目で歌詞を表示する
+  rec('譜面が拍のマス目で表示する',
+      (await page.$$('[data-mlyric="8"] .mlb')).length === 4,
+      String((await page.$$('[data-mlyric="8"] .mlb')).length));
+
+  // ← → で1拍ずつ動かせる
+  await page.evaluate(() => window.__poc.openLyricSheet(8));
+  await page.waitForTimeout(300);
+  await page.tap('.lnudge[data-b="2"][data-d="1"]');
+  await page.waitForTimeout(400);
+  rec('→ で1拍うしろへ動く',
+      (await page.evaluate(() => window.__poc.lyrics['8.3'])) === 'ダミーい'
+      && (await page.evaluate(() => window.__poc.lyrics['8.2'])) === undefined,
+      await page.evaluate(() => JSON.stringify(window.__poc.lyrics)));
+
+  // 小節をまたいで動く
+  await page.tap('.lnudge[data-b="3"][data-d="1"]');
+  await page.waitForTimeout(400);
+  rec('小節をまたいで動く',
+      (await page.evaluate(() => window.__poc.lyrics['9.0'])) === 'ダミーい',
+      await page.evaluate(() => JSON.stringify(window.__poc.lyrics)));
+  rec('動かした先の小節にシートが移る',
+      (await page.textContent('#sheetTitle')).indexOf('M10') === 0,
+      await page.textContent('#sheetTitle'));
+
+  // 移動先が埋まっていれば動かさない
+  await page.evaluate(() => window.__poc.closeSheet());
+  await page.waitForTimeout(200);
+  const blocked = await page.evaluate(() => {
+    window.__poc.lyrics['9.1'] = 'ダミー壁';
+    return window.__poc.shiftFragment ? 'n/a' : 'n/a';
+  });
+  await page.evaluate(() => window.__poc.openLyricSheet(9));
+  await page.waitForTimeout(300);
+  await page.tap('.lnudge[data-b="0"][data-d="1"]');
+  await page.waitForTimeout(400);
+  rec('移動先が埋まっていれば動かさない',
+      (await page.evaluate(() => window.__poc.lyrics['9.0'])) === 'ダミーい'
+      && (await page.evaluate(() => window.__poc.lyrics['9.1'])) === 'ダミー壁',
+      await page.evaluate(() => JSON.stringify(window.__poc.lyrics)));
+  await page.evaluate(() => window.__poc.closeSheet());
+  await page.waitForTimeout(200);
+
+  // 全体を1拍／1小節ずらす
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(300);
+  await page.fill('#lyricInput', 'M9 ダミーX\nM10.2 ダミーY');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  await page.tap('#shiftB1');
+  await page.waitForTimeout(300);
+  rec('全体を1拍うしろへずらせる',
+      (await page.evaluate(() => JSON.stringify(window.__poc.lyrics)))
+        === '{"8.1":"ダミーX","9.2":"ダミーY"}',
+      await page.evaluate(() => JSON.stringify(window.__poc.lyrics)));
+  await page.tap('#shiftB-1');
+  await page.waitForTimeout(300);
+  await page.tap('#shiftM1');
+  await page.waitForTimeout(300);
+  rec('全体を1小節うしろへずらせる',
+      (await page.evaluate(() => JSON.stringify(window.__poc.lyrics)))
+        === '{"9.0":"ダミーX","10.1":"ダミーY"}',
+      await page.evaluate(() => JSON.stringify(window.__poc.lyrics)));
+  await page.tap('#shiftM-1');
+  await page.waitForTimeout(300);
+
+  // 曲の外へは出さない
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(200);
+  await page.fill('#lyricInput', 'M1 ダミー先頭');
+  await page.tap('#lyricApply');
+  await page.waitForTimeout(300);
+  await page.tap('#shiftB-1');
+  await page.waitForTimeout(300);
+  rec('曲の外へはずらさない',
+      (await page.evaluate(() => window.__poc.lyrics['0.0'])) === 'ダミー先頭'
+      && (await page.textContent('#lyricStat')).indexOf('ずらせませんでした') >= 0);
+
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(300);
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(400);
   await page.screenshot({ path: '/home/user/work/chromium_shot.png', fullPage: false });
