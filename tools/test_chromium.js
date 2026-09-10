@@ -491,6 +491,123 @@ function rec(name, ok, detail) {
       (await page.evaluate(() => window.__poc.lyrics['0.0'])) === 'ダミー先頭'
       && (await page.textContent('#lyricStat')).indexOf('ずらせませんでした') >= 0);
 
+  // --- レビュー指摘1〜5の再発防止 ---
+
+  // 指摘1: 歌詞に " が入っても属性を突破できず、本文も欠けない
+  await page.tap('#lyricClear');
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    window.__pwned = 0;
+    window.__poc.lyrics['0.0'] = 'a" autofocus onfocus="window.__pwned=1" x="';
+    window.__poc.openLyricSheet(0);
+  });
+  await page.waitForTimeout(300);
+  const attrs = await page.evaluate(() => {
+    var el = document.querySelector('.lfield[data-b="0"]'), out = [], i;
+    for(i = 0; i < el.attributes.length; i++){ out.push(el.attributes[i].name); }
+    return { attrs: out, value: el.value };
+  });
+  rec('歌詞の " で属性を突破できない',
+      attrs.attrs.indexOf('onfocus') < 0 && attrs.attrs.indexOf('autofocus') < 0,
+      JSON.stringify(attrs.attrs));
+  rec('" を含む歌詞が欠けずに編集欄へ入る',
+      attrs.value === 'a" autofocus onfocus="window.__pwned=1" x="', attrs.value);
+  await page.tap('#lyricSaveOne');
+  await page.waitForTimeout(300);
+  rec('" を含む歌詞が保存で切り捨てられない',
+      (await page.evaluate(() => window.__poc.lyricAt(0, 0)))
+        === 'a" autofocus onfocus="window.__pwned=1" x="',
+      await page.evaluate(() => window.__poc.lyricAt(0, 0)));
+  rec('スクリプトが実行されていない',
+      (await page.evaluate(() => window.__pwned)) === 0);
+
+  // 指摘2: 2/4小節へ寄せるときに断片が重なって消えない
+  const twoFour = await page.evaluate(() => {
+    var i, mb = window.__poc.measBeats;
+    for(i = 0; i < mb.length; i++){ if(mb[i] !== 4){ return i; } }
+    return -1;
+  });
+  rec('2/4小節の位置を特定できる', twoFour >= 0, 'index=' + twoFour);
+  const collide = await page.evaluate(idx => {
+    var L = window.__poc.lyrics, k;
+    for(k in L){ if(L.hasOwnProperty(k)){ delete L[k]; } }
+    L[(idx + 1) + '.1'] = 'A'; L[(idx + 1) + '.2'] = 'B'; L[(idx + 1) + '.3'] = 'C';
+    var ok = window.__poc.shiftAllMeasures(-1);
+    return { ok: ok, after: JSON.stringify(L) };
+  }, twoFour);
+  rec('2/4小節への重なりで断片を消さない',
+      collide.ok === false
+      && collide.after === '{"' + (twoFour + 1) + '.1":"A","' + (twoFour + 1)
+         + '.2":"B","' + (twoFour + 1) + '.3":"C"}',
+      JSON.stringify(collide));
+
+  // 指摘3: 同じコードが続く小節でも、拍が進むと強調が移る
+  await page.evaluate(() => {
+    var L = window.__poc.lyrics, k;
+    for(k in L){ if(L.hasOwnProperty(k)){ delete L[k]; } }
+    L['0.0'] = 'ダミー前'; L['0.2'] = 'ダミー後';
+    window.__poc.repaintAll();
+  });
+  await page.fill('#bpm', '200');
+  await page.dispatchEvent('#bpm', 'change');
+  await page.waitForTimeout(200);
+  await page.tap('#reset');
+  await page.waitForTimeout(200);
+  const onAt0 = await page.textContent('.lyFrag.on');
+  await page.tap('#play');
+  await page.waitForTimeout(800);
+  const onLater = await page.textContent('.lyFrag.on');
+  await page.tap('#play');
+  await page.tap('#reset');
+  await page.waitForTimeout(200);
+  rec('拍が進むと強調が次の断片へ移る',
+      onAt0.trim() === 'ダミー前' && onLater.trim() === 'ダミー後',
+      onAt0.trim() + ' -> ' + onLater.trim());
+  await page.fill('#bpm', '85');
+  await page.dispatchEvent('#bpm', 'change');
+  await page.waitForTimeout(200);
+
+  // 指摘4: 動かせなかったとき、画面と保存内容がずれない
+  await page.evaluate(() => {
+    var L = window.__poc.lyrics, k;
+    for(k in L){ if(L.hasOwnProperty(k)){ delete L[k]; } }
+    L['10.0'] = 'ダミー1'; L['10.1'] = 'ダミー2';
+    window.__poc.store.set('aliens.lyrics.v1', JSON.stringify(L));
+    window.__poc.openLyricSheet(10);
+  });
+  await page.waitForTimeout(300);
+  await page.fill('.lfield[data-b="3"]', 'ダミー幽霊');
+  await page.tap('.lnudge[data-b="0"][data-d="1"]');
+  await page.waitForTimeout(400);
+  const sync = await page.evaluate(() => ({
+    mem: JSON.stringify(window.__poc.lyrics),
+    stored: localStorage.getItem('aliens.lyrics.v1')
+  }));
+  rec('動かせなくてもメモリと保存内容が一致する', sync.mem === sync.stored,
+      'mem=' + sync.mem + ' stored=' + sync.stored);
+  await page.evaluate(() => window.__poc.closeSheet());
+  await page.waitForTimeout(200);
+
+  // 指摘5: 移動してもページのスクロール位置が失われない
+  await page.evaluate(() => {
+    var L = window.__poc.lyrics, k;
+    for(k in L){ if(L.hasOwnProperty(k)){ delete L[k]; } }
+    L['40.0'] = 'ダミー移動';
+    window.__poc.repaintAll();
+    window.scrollTo(0, 1500);
+  });
+  await page.waitForTimeout(300);
+  const beforeScroll = await page.evaluate(() => window.pageYOffset);
+  await page.evaluate(() => window.__poc.openLyricSheet(40));
+  await page.waitForTimeout(300);
+  await page.tap('.lnudge[data-b="0"][data-d="1"]');
+  await page.waitForTimeout(400);
+  await page.evaluate(() => window.__poc.closeSheet());
+  await page.waitForTimeout(300);
+  const afterScroll = await page.evaluate(() => window.pageYOffset);
+  rec('移動してもスクロール位置が戻る', Math.abs(afterScroll - beforeScroll) < 5,
+      beforeScroll + ' -> ' + afterScroll);
+
   await page.tap('#lyricClear');
   await page.waitForTimeout(300);
   await page.reload({ waitUntil: 'load' });

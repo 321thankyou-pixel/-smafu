@@ -516,14 +516,18 @@ function shiftAllBeats(delta){
 }
 /* 全体を delta 小節ずらす（拍位置は保つ。行き先の拍数を超える場合は末尾の拍に寄せる） */
 function shiftAllMeasures(delta){
-  var keys = [], k, i, kk, mi2, b2, out = {};
+  var keys = [], k, i, kk, mi2, b2, nk, out = {};
   for(k in lyrics){ if(lyrics.hasOwnProperty(k)){ keys.push(k); } }
   for(i = 0; i < keys.length; i++){
     kk = parseKey(keys[i]);
     mi2 = kk.mi + delta;
     if(mi2 < 0 || mi2 >= measures.length){ return false; }
     b2 = Math.min(kk.b, measBeats[mi2] - 1);
-    out[lyricKey(mi2, b2)] = lyrics[keys[i]];
+    nk = lyricKey(mi2, b2);
+    /* 拍数の少ない小節（2/4）へ寄せると複数の断片が同じ拍に重なる。
+       黙って消さず、何も動かさずに失敗を返す */
+    if(out.hasOwnProperty(nk)){ return false; }
+    out[nk] = lyrics[keys[i]];
   }
   for(k in lyrics){ if(lyrics.hasOwnProperty(k)){ delete lyrics[k]; } }
   for(k in out){ if(out.hasOwnProperty(k)){ lyrics[k] = out[k]; } }
@@ -546,7 +550,9 @@ function saveLyrics(){
   return ok;
 }
 function esc(t){
-  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  /* 属性値の中にも入れるので " と ' も必ずエスケープする */
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function matchNumbered(line){
   /* M9 歌詞 / 9: 歌詞 / M9.3 歌詞（3拍目）。拍は1始まりで書く */
@@ -793,7 +799,7 @@ function repaintAll(){
 }
 function paintLyricStat(){
   var n = lyricCount(), el = document.getElementById('lyricStat');
-  el.innerHTML = n ? ('登録済み <b>' + n + '</b> 小節（この端末のみ）') : '未登録';
+  el.innerHTML = n ? ('登録済み <b>' + n + '</b> か所（この端末のみ）') : '未登録';
 }
 
 /* ---------- ボトムシート ---------- */
@@ -835,7 +841,11 @@ function onPick(ev){
   paintOptions(sheetChord);
 }
 function showSheet(){
-  scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+  /* 既に開いている状態から開き直すとき（断片を追いかける移動）は
+     スクロール位置を取り直さない。body が position:fixed で 0 になるため */
+  if(sheet.className.indexOf('open') < 0){
+    scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+  }
   scrim.className = 'scrim open';
   sheet.className = 'sheet open';
   document.body.style.position = 'fixed';
@@ -859,10 +869,8 @@ function lyricSheetHTML(mi){
           + '<span class="lbeat">' + (b + 1) + '拍</span>'
           + '<span class="lchord">' + esc(dispChord(chordAtBeat(mi, b))) + '</span>'
           + '<input class="lfield" type="text" data-b="' + b + '" value="' + esc(t) + '">'
-          + '<button class="lnudge" type="button" data-b="' + b + '" data-d="-1"'
-          + (t ? '' : ' disabled') + '>&larr;</button>'
-          + '<button class="lnudge" type="button" data-b="' + b + '" data-d="1"'
-          + (t ? '' : ' disabled') + '>&rarr;</button>'
+          + '<button class="lnudge" type="button" data-b="' + b + '" data-d="-1">&larr;</button>'
+          + '<button class="lnudge" type="button" data-b="' + b + '" data-d="1">&rarr;</button>'
           + '</div>';
   }
   html += '<div class="lrow lrowEnd">'
@@ -879,8 +887,18 @@ function bindLyricSheet(mi){
       var b = parseInt(btn.getAttribute('data-b'), 10),
           d = parseInt(btn.getAttribute('data-d'), 10), to;
       commitLyricFields(mi);           /* 入力中の内容を先に確定させる */
+      if(!lyrics.hasOwnProperty(lyricKey(mi, b))){
+        saveLyrics(); paintScoreLyrics(); paintLyricStat(); redraw(true);
+        openLyricSheet(mi);
+        document.getElementById('lhint').innerHTML =
+          '<span class="keyWarn">この拍に歌詞がありません</span>';
+        return;
+      }
       to = shiftFragment(mi, b, d);
       if(!to){
+        /* 動かせなくても、確定済みの入力は保存して画面と保存内容を揃える */
+        saveLyrics(); paintScoreLyrics(); paintLyricStat(); redraw(true);
+        openLyricSheet(mi);
         document.getElementById('lhint').innerHTML =
           '<span class="keyWarn">移動先が埋まっているか、曲の外です</span>';
         return;
@@ -975,12 +993,12 @@ function fmtTime(ms){
   s = s % 60;
   return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
 }
-var loc = {i:0, local:0}, lastSeqI = -1;
+var loc = {i:0, local:0}, lastSeqI = -1, lastLyricAbs = -1;
 function redraw(force){
   var x = seq[loc.i],
       n = seq[Math.min(loc.i+1, seq.length-1)],
       a = seq[Math.min(loc.i+2, seq.length-1)],
-      m = measures[x.mi], el, olds, k;
+      m = measures[x.mi], el, olds, k, curAbs;
   /* カードの再描画はコードが変わったときだけ（毎フレームやると実機で重い） */
   if(force || lastSeqI !== loc.i){
     lastSeqI = loc.i;
@@ -988,9 +1006,7 @@ function redraw(force){
     renderCard(cards.next, n.chord);
     renderCard(cards.after, a.chord);
     document.getElementById('sectionTitle').textContent = m.section + (m.cue ? ' \u30fb ' + m.cue : '');
-    document.getElementById('lyric').innerHTML =
-      bigLyricHTML(x.mi, x.bstart + Math.floor(loc.local))
-      + '<small>' + m.meter + ' \u30fb M' + (x.mi+1) + '</small>';
+    lastLyricAbs = -1;   /* 小節が変わったら歌詞行を必ず描き直す */
     if(lastMi !== x.mi){
       olds = document.querySelectorAll('.mini.activeMeasure');
       for(k=0;k<olds.length;k++){ olds[k].className = 'mini'; }
@@ -998,6 +1014,14 @@ function redraw(force){
       if(el){ el.className = 'mini activeMeasure'; }
       lastMi = x.mi;
     }
+  }
+  /* 歌詞行は「拍」が変わるたびに描き直す（コードが変わるときだけでは足りない） */
+  curAbs = absBeat(x.mi, x.bstart + Math.floor(loc.local));
+  if(force || lastLyricAbs !== curAbs){
+    lastLyricAbs = curAbs;
+    document.getElementById('lyric').innerHTML =
+      bigLyricHTML(x.mi, x.bstart + Math.floor(loc.local))
+      + '<small>' + m.meter + ' \u30fb M' + (x.mi+1) + '</small>';
   }
   document.getElementById('codebar').style.width = (Math.min(1, loc.local / x.beats) * 100) + '%';
 }
@@ -1037,7 +1061,7 @@ document.getElementById('play').addEventListener('click', function(){
 document.getElementById('reset').addEventListener('click', function(){
   playing = false;
   if(window.cancelAnimationFrame){ window.cancelAnimationFrame(rafId); }
-  pos = 0; lastMi = -1; lastSeqI = -1;
+  pos = 0; lastMi = -1; lastSeqI = -1; lastLyricAbs = -1;
   document.getElementById('play').textContent = '\u25b6 再生';
   tick(0);
 }, false);
@@ -1129,9 +1153,9 @@ document.getElementById('lyricApply').addEventListener('click', function(){
   for(di = 0; di < res.del.length; di++){ delete lyrics[res.del[di]]; }
   if(!saveLyrics()){ paintScoreLyrics(); redraw(true); return; }
   paintScoreLyrics(); redraw(true); paintLyricStat();
-  msg = '　/　今回 <b>' + res.count + '</b> 小節を取り込みました（'
+  msg = '　/　今回 <b>' + res.count + '</b> か所を取り込みました（'
       + (res.mode === 'numbered' ? '小節番号つきとして読み取り' : 'M' + start + ' から順に割り当て') + '）';
-  if(res.del.length){ msg += '　/　空行のため <b>' + res.del.length + '</b> 小節を空にしました'; }
+  if(res.del.length){ msg += '　/　空行のため <b>' + res.del.length + '</b> か所を空にしました'; }
   if(res.skipped){
     msg += '　/　<span class="keyWarn">小節番号の無い ' + res.skipped + ' 行は取り込めませんでした</span>';
   }
