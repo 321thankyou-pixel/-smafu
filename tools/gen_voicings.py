@@ -20,50 +20,53 @@ R, m3, M3, P4, b5, P5, s5, M6, m7, M7 = 0, 3, 4, 5, 6, 7, 8, 9, 10, 11
 b9, n9, s9, n11, n13 = 1, 2, 3, 5, 9
 
 DEFS = {
-  'CM7':        ('C', [R,M3,P5,M7],        [R,M3,M7],        None),
-  'CM9':        ('C', [R,M3,P5,M7,n9],     [R,M3,M7,n9],     None),
-  'CmM7':       ('C', [R,m3,P5,M7],        [R,m3,M7],        None),
-  'CmM7(13)':   ('C', [R,m3,P5,M7,n13],    [R,m3,M7,n13],    None),
-  'Cm6':        ('C', [R,m3,P5,M6],        [R,m3,M6],        None),
-  'B7':         ('B', [R,M3,P5,m7],        [R,M3,m7],        None),
-  'Baug7':      ('B', [R,M3,s5,m7],        [R,M3,s5,m7],     None),
-  'Baug7(b9)':  ('B', [R,M3,s5,m7,b9],     [R,M3,s5,m7,b9],  None),
-  'Baug7(#9)':  ('B', [R,M3,s5,m7,s9],     [R,M3,s5,m7,s9],  None),
-  'Em9':        ('E', [R,m3,P5,m7,n9],     [R,m3,m7,n9],     None),
-  'Em7':        ('E', [R,m3,P5,m7],        [R,m3,m7],        None),
-  'E7':         ('E', [R,M3,P5,m7],        [R,M3,m7],        None),
-  'E9':         ('E', [R,M3,P5,m7,n9],     [R,M3,m7,n9],     None),
-  'A7':         ('A', [R,M3,P5,m7],        [R,M3,m7],        None),
-  'A7(13)':     ('A', [R,M3,P5,m7,n13],    [R,M3,m7,n13],    None),
-  'Am7':        ('A', [R,m3,P5,m7],        [R,m3,m7],        None),
-  'Bm7':        ('B', [R,m3,P5,m7],        [R,m3,m7],        None),
-  'Bb7':        ('A#',[R,M3,P5,m7],        [R,M3,m7],        None),
-  'F9':         ('F', [R,M3,P5,m7,n9],     [R,M3,m7,n9],     None),
-  'G9':         ('G', [R,M3,P5,m7,n9],     [R,M3,m7,n9],     None),
-  'G9(13)':     ('G', [R,M3,P5,m7,n9,n13], [R,M3,m7,n9,n13], None),
-  'GM7':        ('G', [R,M3,P5,M7],        [R,M3,M7],        None),
-  'Dm7':        ('D', [R,m3,P5,m7],        [R,m3,m7],        None),
-  'D9':         ('D', [R,M3,P5,m7,n9],     [R,M3,m7,n9],     None),
-  'D9sus4':     ('D', [R,P4,P5,m7,n9],     [R,P4,m7,n9],     None),
-  'C#m7-5':     ('C#',[R,m3,b5,m7],        [R,m3,b5,m7],     None),
-  'F#7':        ('F#',[R,M3,P5,m7],        [R,M3,m7],        None),
-  'F#7(b9)':    ('F#',[R,M3,P5,m7,b9],     [R,M3,m7,b9],     None),
-  'F#m7':       ('F#',[R,m3,P5,m7],        [R,m3,m7],        None),
-  'F#m11':      ('F#',[R,m3,P5,m7,n11],    [R,m3,m7,n11],    None),
+  'BbM7':       ('Bb', [R,M3,P5,M7],        [R,M3,M7], None),
+  'BbM9':       ('Bb', [R,M3,P5,M7,n9],     [R,M3,M7,n9], None),
+  'BbmM7':      ('Bb', [R,m3,P5,M7],        [R,m3,M7], None),
+  'BbmM7(13)':  ('Bb', [R,m3,P5,M7,n13],    [R,m3,M7,n13], None),
+  'Bbm6':       ('Bb', [R,m3,P5,M6],        [R,m3,M6], None),
+  'A7':         ('A', [R,M3,P5,m7],        [R,M3,m7], None),
+  'Aaug7':      ('A', [R,M3,s5,m7],        [R,M3,s5,m7], None),
+  'Aaug7(b9)':  ('A', [R,M3,s5,m7,b9],     [R,M3,s5,m7,b9], None),
+  'Aaug7(#9)':  ('A', [R,M3,s5,m7,s9],     [R,M3,s5,m7,s9], None),
+  'Dm9':        ('D', [R,m3,P5,m7,n9],     [R,m3,m7,n9], None),
+  'Dm7':        ('D', [R,m3,P5,m7],        [R,m3,m7], None),
+  'D7':         ('D', [R,M3,P5,m7],        [R,M3,m7], None),
+  'D9':         ('D', [R,M3,P5,m7,n9],     [R,M3,m7,n9], None),
+  'G7':         ('G', [R,M3,P5,m7],        [R,M3,m7], None),
+  'G7(13)':     ('G', [R,M3,P5,m7,n13],    [R,M3,m7,n13], None),
+  'Gm7':        ('G', [R,m3,P5,m7],        [R,m3,m7], None),
+  'Am7':        ('A', [R,m3,P5,m7],        [R,m3,m7], None),
+  'G#7':        ('G#',[R,M3,P5,m7],        [R,M3,m7], None),
+  'D#9':        ('D#', [R,M3,P5,m7,n9],     [R,M3,m7,n9], None),
+  'F9':         ('F', [R,M3,P5,m7,n9],     [R,M3,m7,n9], None),
+  'F9(13)':     ('F', [R,M3,P5,m7,n9,n13], [R,M3,m7,n9,n13], None),
+  'FM7':        ('F', [R,M3,P5,M7],        [R,M3,M7], None),
+  'Cm7':        ('C', [R,m3,P5,m7],        [R,m3,m7], None),
+  'C9':         ('C', [R,M3,P5,m7,n9],     [R,M3,m7,n9], None),
+  'C9sus4':     ('C', [R,P4,P5,m7,n9],     [R,P4,m7,n9], None),
+  'Bm7-5':      ('B',[R,m3,b5,m7],        [R,m3,b5,m7], None),
+  'E7':         ('E',[R,M3,P5,m7],        [R,M3,m7], None),
+  'E7(b9)':     ('E',[R,M3,P5,m7,b9],     [R,M3,m7,b9], None),
+  'Em7':        ('E',[R,m3,P5,m7],        [R,m3,m7], None),
+  'Em11':       ('E',[R,m3,P5,m7,n11],    [R,m3,m7,n11], None),
   # オンコード
-  'Dsus4/B':    ('D', [R,P4,P5],           [R,P4],           'B'),
-  'D/C':        ('D', [R,M3,P5],           [R,M3],           'C'),
-  'D/E':        ('D', [R,M3,P5],           [R,M3],           'E'),
-  'G7/D':       ('G', [R,M3,P5,m7],        [R,M3,m7],        'D'),
-  'Bm7/E':      ('B', [R,m3,P5,m7],        [R,m3,m7],        'E'),
-  'F#m7/B':     ('F#',[R,m3,P5,m7],        [R,m3,m7],        'B'),
-  'F#(b9)/Bb':  ('F#',[R,M3,P5,b9],        [R,M3,b9],        'A#'),
+  'Csus4/A':    ('C', [R,P4,P5],           [R,P4], 'A'),
+  'C/Bb':       ('C', [R,M3,P5],           [R,M3], 'Bb'),
+  'C/D':        ('C', [R,M3,P5],           [R,M3], 'D'),
+  'F7/C':       ('F', [R,M3,P5,m7],        [R,M3,m7], 'C'),
+  'Am7/D':      ('A', [R,m3,P5,m7],        [R,m3,m7], 'D'),
+  'Em7/A':      ('E',[R,m3,P5,m7],        [R,m3,m7], 'A'),
+  'E(b9)/G#':   ('E',[R,M3,P5,b9],        [R,M3,b9], 'G#'),
 }
 
 MAXF = 14
 
 def fingers_needed(form):
-    """form: 6要素(6弦->1弦), 'x' か int。押弦に必要な指の本数を見積る。足りなければ None"""
+    """form: 6要素(6弦->1弦), 'x' か int。押弦に必要な指の本数を見積る。
+    セーハは「最低フレット」に限らず、どのフレットでも・どの範囲でも検討する
+    （人差し指で低い音を押さえ、薬指で上を部分セーハする形なども拾うため）。
+    押さえられない形は None。"""
     fr = [(i, v) for i, v in enumerate(form) if isinstance(v, int) and v > 0]
     if not fr:
         return 0
@@ -71,17 +74,25 @@ def fingers_needed(form):
     lo, hi = min(frets), max(frets)
     if hi - lo > 3:
         return None
-    plain = len(fr)
-    if plain <= 4:
-        return plain
-    # セーハを検討: 最低フレットで全弦を押さえる
-    # セーハ指はその範囲の全弦に触れるため、範囲内に開放弦もミュート弦も作れない
-    lo_idx = min(i for i, v in enumerate(form) if v != 'x')
-    for i in range(lo_idx, 6):
-        if form[i] == 'x' or form[i] == 0:
-            return None
-    barre = 1 + sum(1 for _, v in fr if v > lo)
-    return barre if barre <= 4 else None
+    best = len(fr) if len(fr) <= 4 else None   # セーハ無しで押さえる場合
+    sounding = [i for i, v in enumerate(form) if v != 'x']
+    for f in sorted(set(frets)):
+        # f フレットのセーハが覆う範囲 [i..5]（1弦側は必ず含む）
+        for i in range(0, 6):
+            span = [k for k in range(i, 6) if form[k] != 'x']
+            if len(span) < 2:
+                continue
+            # セーハ範囲に開放弦・ミュート弦は作れない。f 未満の押弦も不可
+            if any(form[k] == 'x' or form[k] == 0 or form[k] < f for k in range(i, 6)):
+                continue
+            if not any(form[k] == f for k in range(i, 6)):
+                continue                      # そのフレットを実際に押さえていない
+            cost = 1
+            cost += sum(1 for k in range(i, 6) if form[k] > f)
+            cost += sum(1 for k in sounding if k < i and form[k] > 0)
+            if cost <= 4 and (best is None or cost < best):
+                best = cost
+    return best
 
 def analyze(form):
     out = []

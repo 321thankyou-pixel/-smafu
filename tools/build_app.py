@@ -301,8 +301,8 @@ main{padding:10px 10px 92px}
  <h2>演奏設定</h2>
  <div class="setRow"><span class="lab">チューニング</span>
   <span class="seg" id="segTune">
-   <button type="button" data-v="-1">半音下げ</button>
    <button type="button" data-v="0">レギュラー</button>
+   <button type="button" data-v="-1">半音下げ</button>
   </span></div>
  <div class="setRow"><span class="lab">カポ</span>
   <input id="capo" type="number" min="0" max="7" step="1" value="0"><span class="lab">フレット</span></div>
@@ -483,15 +483,17 @@ var restored = [];
 function sel(chord){ return selected.hasOwnProperty(chord) ? selected[chord] : 0; }
 
 /* ---------- 演奏設定（チューニング・カポ・表記・テンポ） ---------- */
-var SET_KEY = 'aliens.settings.v1';
-var SHAPE_KEY_PC = 7;    /* この譜面が前提とする「押さえる形」のキー = G */
+/* 譜面の基準が Play: G(半音下げ) から Play: F(カポ1) に変わったので、
+   保存済みの設定を引き継がないようキーを v2 にする */
+var SET_KEY = 'aliens.settings.v2';
+var SHAPE_KEY_PC = 5;    /* この譜面が前提とする「押さえる形」のキー = F */
 var ORIG_KEY_PC = 6;     /* 原曲キー = F# */
 var KEYNAME = ['C','C#/Db','D','D#/Eb','E','F','F#/Gb','G','G#/Ab','A','A#/Bb','B'];
 var FLATN  = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
 var SHARPN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 var PCMAP = {'C':0,'C#':1,'Db':1,'D':2,'D#':3,'Eb':3,'E':4,'F':5,'F#':6,'Gb':6,
              'G':7,'G#':8,'Ab':8,'A':9,'A#':10,'Bb':10,'B':11};
-var settings = { tune: -1, capo: 0, view: 'shape', bpm: 85 };
+var settings = { tune: 0, capo: 1, view: 'shape', bpm: 85 };
 (function(){
   var raw = store.get(SET_KEY), o = null;
   if(!raw){ return; }

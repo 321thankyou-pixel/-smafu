@@ -245,8 +245,8 @@ function rec(name, ok, detail) {
       (await page.textContent('.card.current .chord')).trim() === 'BM7',
       await page.textContent('.card.current .chord'));
   rec('実音表記に切り替わる（譜面）',
-      (await page.textContent('.mc[data-c="CM7"]')).indexOf('BM7') === 0,
-      (await page.textContent('.mc[data-c="CM7"]')).trim());
+      (await page.textContent('.mc[data-c="BbM7"]')).indexOf('BM7') === 0,
+      (await page.textContent('.mc[data-c="BbM7"]')).trim());
   // 表記を変えてもフォーム辞書は元のコード名で引ける
   await page.tap('.card.next');
   await page.waitForTimeout(300);
@@ -255,15 +255,18 @@ function rec(name, ok, detail) {
   await page.tap('#closeSheet');
   await page.waitForTimeout(200);
 
-  // キー判定
-  rec('半音下げ・カポなしで原曲キーと一致と表示',
-      (await page.textContent('#keyBox')).indexOf('原曲キーと一致') >= 0);
-  await page.tap('#segTune button[data-v="0"]');
+  // キー判定（この譜面は Play: F / カポ1 が基準）
+  rec('レギュラー・カポ1で原曲キーと一致と表示',
+      (await page.textContent('#keyBox')).indexOf('原曲キーと一致') >= 0,
+      (await page.textContent('#keyBox')).slice(0, 60).replace(/\s+/g, ' '));
+  rec('押さえる形のキーが F と出る',
+      (await page.textContent('#keyBox')).indexOf('F') >= 0);
+  await page.tap('#segTune button[data-v="-1"]');
   await page.waitForTimeout(300);
-  rec('レギュラーにすると原曲より高いと表示',
+  rec('半音下げにすると原曲キーからずれると表示',
       (await page.textContent('#keyBox')).indexOf('原曲より') >= 0,
       (await page.textContent('#keyBox')).slice(0, 60).replace(/\s+/g, ' '));
-  await page.tap('#segTune button[data-v="-1"]');
+  await page.tap('#segTune button[data-v="0"]');
   await page.waitForTimeout(300);
 
   // カポ
@@ -272,7 +275,7 @@ function rec(name, ok, detail) {
   await page.waitForTimeout(300);
   rec('カポがヘッダーに出る', (await page.textContent('#meta')).indexOf('カポ2F') >= 0,
       await page.textContent('#meta'));
-  await page.fill('#capo', '0');
+  await page.fill('#capo', '1');
   await page.dispatchEvent('#capo', 'change');
   await page.waitForTimeout(300);
 

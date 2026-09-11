@@ -260,8 +260,8 @@ try:
         d.find_element(By.CSS_SELECTOR, '.card.current .chord').text.strip() == 'BM7',
         d.find_element(By.CSS_SELECTOR, '.card.current .chord').text)
     rec('実音表記に切り替わる（譜面）',
-        d.find_element(By.CSS_SELECTOR, '.mc[data-c="CM7"]').text.strip().startswith('BM7'),
-        d.find_element(By.CSS_SELECTOR, '.mc[data-c="CM7"]').text.strip())
+        d.find_element(By.CSS_SELECTOR, '.mc[data-c="BbM7"]').text.strip().startswith('BM7'),
+        d.find_element(By.CSS_SELECTOR, '.mc[data-c="BbM7"]').text.strip())
     sclick(d, d.find_element(By.CSS_SELECTOR, '.card.next'))
     time.sleep(0.4)
     rec('実音表記でもフォーム候補が出る',
@@ -269,13 +269,14 @@ try:
     sclick(d, d.find_element(By.ID, 'closeSheet'))
     time.sleep(0.3)
 
-    rec('半音下げ・カポなしで原曲キーと一致と表示',
-        '原曲キーと一致' in d.find_element(By.ID, 'keyBox').text)
-    sclick(d, d.find_element(By.CSS_SELECTOR, '#segTune button[data-v="0"]'))
-    time.sleep(0.4)
-    rec('レギュラーにすると原曲より高いと表示',
-        '原曲より' in d.find_element(By.ID, 'keyBox').text)
+    rec('レギュラー・カポ1で原曲キーと一致と表示',
+        '原曲キーと一致' in d.find_element(By.ID, 'keyBox').text,
+        d.find_element(By.ID, 'keyBox').text[:50].replace('\n', ' '))
     sclick(d, d.find_element(By.CSS_SELECTOR, '#segTune button[data-v="-1"]'))
+    time.sleep(0.4)
+    rec('半音下げにすると原曲キーからずれると表示',
+        '原曲より' in d.find_element(By.ID, 'keyBox').text)
+    sclick(d, d.find_element(By.CSS_SELECTOR, '#segTune button[data-v="0"]'))
     time.sleep(0.3)
 
     d.execute_script(
